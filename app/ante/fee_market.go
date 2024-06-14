@@ -16,9 +16,9 @@
 package ante
 
 import (
-	"math/big"
+	// "math/big"
 
-	errorsmod "cosmossdk.io/errors"
+	// errorsmod "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
@@ -42,27 +42,27 @@ func NewGasWantedDecorator(
 }
 
 func (gwd GasWantedDecorator) AnteHandle(ctx sdk.Context, tx sdk.Tx, simulate bool, next sdk.AnteHandler) (newCtx sdk.Context, err error) {
-	evmParams := gwd.evmKeeper.GetParams(ctx)
-	chainCfg := evmParams.GetChainConfig()
-	ethCfg := chainCfg.EthereumConfig(gwd.evmKeeper.ChainID())
+	// evmParams := gwd.evmKeeper.GetParams(ctx)
+	// chainCfg := evmParams.GetChainConfig()
+	// ethCfg := chainCfg.EthereumConfig(gwd.evmKeeper.ChainID())
 
-	blockHeight := big.NewInt(ctx.BlockHeight())
-	isLondon := ethCfg.IsLondon(blockHeight)
+	// blockHeight := big.NewInt(ctx.BlockHeight())
+	// isLondon := ethCfg.IsLondon(blockHeight)
 
-	feeTx, ok := tx.(sdk.FeeTx)
-	if !ok || !isLondon {
-		return next(ctx, tx, simulate)
-	}
+	// feeTx, ok := tx.(sdk.FeeTx)
+	// if !ok || !isLondon {
+	// 	return next(ctx, tx, simulate)
+	// }
 
-	gasWanted := feeTx.GetGas()
-	isBaseFeeEnabled := gwd.feeMarketKeeper.GetBaseFeeEnabled(ctx)
+	// gasWanted := feeTx.GetGas()
+	// isBaseFeeEnabled := gwd.feeMarketKeeper.GetBaseFeeEnabled(ctx)
 
-	// Add total gasWanted to cumulative in block transientStore in FeeMarket module
-	if isBaseFeeEnabled {
-		if _, err := gwd.feeMarketKeeper.AddTransientGasWanted(ctx, gasWanted); err != nil {
-			return ctx, errorsmod.Wrapf(err, "failed to add gas wanted to transient store")
-		}
-	}
+	// // Add total gasWanted to cumulative in block transientStore in FeeMarket module
+	// if isBaseFeeEnabled {
+	// 	if _, err := gwd.feeMarketKeeper.AddTransientGasWanted(ctx, gasWanted); err != nil {
+	// 		return ctx, errorsmod.Wrapf(err, "failed to add gas wanted to transient store")
+	// 	}
+	// }
 
 	return next(ctx, tx, simulate)
 }
