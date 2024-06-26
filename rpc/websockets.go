@@ -55,7 +55,7 @@ type WebsocketsServer interface {
 type SubscriptionResponseJSON struct {
 	Jsonrpc string      `json:"jsonrpc"`
 	Result  interface{} `json:"result"`
-	ID      float64     `json:"id"`
+	ID      interface{} `json:"id"`
 }
 
 type SubscriptionNotification struct {
@@ -72,7 +72,7 @@ type SubscriptionResult struct {
 type ErrorResponseJSON struct {
 	Jsonrpc string            `json:"jsonrpc"`
 	Error   *ErrorMessageJSON `json:"error"`
-	ID      *big.Int          `json:"id"`
+	ID      interface{}       `json:"id"`
 }
 
 type ErrorMessageJSON struct {
@@ -225,11 +225,11 @@ func (s *websocketsServer) readLoop(wsConn *wsConn) {
 			continue
 		}
 
-		connID, ok := msg["id"].(float64)
+		connID, ok := msg["id"]
 		if !ok {
 			s.sendErrResponse(
 				wsConn,
-				fmt.Errorf("invalid type for connection ID: %T", msg["id"]).Error(),
+				fmt.Errorf("invalid type for connection ID: %T, msg: %v", msg["id"], msg).Error(),
 			)
 			continue
 		}
