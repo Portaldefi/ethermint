@@ -21,7 +21,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	coretypes "github.com/cometbft/cometbft/rpc/core/types"
+	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 )
 
 type UnsubscribeFunc func()

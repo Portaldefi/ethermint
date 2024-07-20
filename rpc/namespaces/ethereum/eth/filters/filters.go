@@ -24,9 +24,9 @@ import (
 	"github.com/evmos/ethermint/rpc/backend"
 	"github.com/evmos/ethermint/rpc/types"
 
-	"github.com/cometbft/cometbft/libs/log"
-	tmrpctypes "github.com/cometbft/cometbft/rpc/core/types"
 	"github.com/pkg/errors"
+	"github.com/tendermint/tendermint/libs/log"
+	tmrpctypes "github.com/tendermint/tendermint/rpc/core/types"
 
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
@@ -107,7 +107,7 @@ const (
 
 // Logs searches the blockchain for matching log entries, returning all from the
 // first block that contains matches, updating the start of the filter accordingly.
-func (f *Filter) Logs(_ context.Context, logLimit int, blockLimit int64) ([]*ethtypes.Log, error) {
+func (f *Filter) Logs(ctx context.Context, logLimit int, blockLimit int64) ([]*ethtypes.Log, error) {
 	logs := []*ethtypes.Log{}
 	var err error
 

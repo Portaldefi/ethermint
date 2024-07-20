@@ -28,7 +28,7 @@ import (
 	authante "github.com/cosmos/cosmos-sdk/x/auth/ante"
 	"github.com/cosmos/cosmos-sdk/x/auth/migrations/legacytx"
 	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
-	ibcante "github.com/cosmos/ibc-go/v7/modules/core/ante"
+	ibcante "github.com/cosmos/ibc-go/v6/modules/core/ante"
 
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
@@ -44,7 +44,7 @@ var ethermintCodec codec.ProtoCodecMarshaler
 
 func init() {
 	registry := codectypes.NewInterfaceRegistry()
-	//ethermint.RegisterInterfaces(registry)
+	ethermint.RegisterInterfaces(registry)
 	ethermintCodec = codec.NewProtoCodec(registry)
 }
 
@@ -53,8 +53,6 @@ func init() {
 func NewLegacyCosmosAnteHandlerEip712(options HandlerOptions) sdk.AnteHandler {
 	return sdk.ChainAnteDecorators(
 		RejectMessagesDecorator{}, // reject MsgEthereumTxs
-		// disable the Msg types that cannot be included on an authz.MsgExec msgs field
-		NewAuthzLimiterDecorator(options.DisabledAuthzMsgs),
 		authante.NewSetUpContextDecorator(),
 		authante.NewValidateBasicDecorator(),
 		authante.NewTxTimeoutHeightDecorator(),
@@ -266,7 +264,7 @@ func VerifySignature(
 			FeePayer: feePayer,
 		}
 
-		typedData, err := eip712.LegacyWrapTxToTypedData(ethermintCodec, extOpt.TypedDataChainID, msgs[0], txBytes, feeDelegation)
+		typedData, err := eip712.WrapTxToTypedData(ethermintCodec, extOpt.TypedDataChainID, msgs[0], txBytes, feeDelegation)
 		if err != nil {
 			return errorsmod.Wrap(err, "failed to create EIP-712 typed data from tx")
 		}

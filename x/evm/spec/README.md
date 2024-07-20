@@ -15,7 +15,7 @@ Since the introduction of Ethereum in 2015, the ability to control digital asset
 
 The growth of EVM-based chains (e.g. Ethereum), however, has uncovered several scalability challenges that are often referred to as the [Trilemma of decentralization, security, and scalability](https://vitalik.ca/general/2021/04/07/sharding.html). Developers are frustrated by high gas fees, slow transaction speed & throughput, and chain-specific governance that can only undergo slow change because of its wide range of deployed applications. A solution is required that eliminates these concerns for developers, who build applications within a familiar EVM environment.
 
-The `x/evm` module provides this EVM familiarity on a scalable, high-throughput Proof-of-Stake blockchain. It is built as a [Cosmos SDK module](https://docs.cosmos.network/master/building-modules/intro.html) which allows for the deployment of smart contracts, interaction with the EVM state machine (state transitions), and the use of EVM tooling. It can be used on Cosmos application-specific blockchains, which alleviate the aforementioned concerns through high transaction throughput via [Tendermint Core](https://github.com/cometbft/cometbft), fast transaction finality, and horizontal scalability via [IBC](https://ibcprotocol.org/).
+The `x/evm` module provides this EVM familiarity on a scalable, high-throughput Proof-of-Stake blockchain. It is built as a [Cosmos SDK module](https://docs.cosmos.network/master/building-modules/intro.html) which allows for the deployment of smart contracts, interaction with the EVM state machine (state transitions), and the use of EVM tooling. It can be used on Cosmos application-specific blockchains, which alleviate the aforementioned concerns through high transaction throughput via [Tendermint Core](https://github.com/tendermint/tendermint), fast transaction finality, and horizontal scalability via [IBC](https://ibcprotocol.org/).
 
 The `x/evm` is part of the [ethermint library](https://pkg.go.dev/github.com/evmos/ethermint). For an example of how Ethermint can be used on any Cosmos-SDK chain, please refer to [Evmos](https://www.github.com/tharsis/evmos).
 
@@ -26,17 +26,16 @@ The `x/evm` is part of the [ethermint library](https://pkg.go.dev/github.com/evm
 3. **[State Transitions](03_state_transitions.md)**
 4. **[Transactions](04_transactions.md)**
 5. **[ABCI](05_abci.md)**
-6. **[Hooks](06_hooks.md)**
-7. **[Events](07_events.md)**
-8. **[Parameters](08_params.md)**
-9. **[Client](09_client.md)**
-10. **[Virtual Frontier Contract](10_virtual_frontier_contract.md)**
+6. **[Hooks](05_hooks.md)**
+7. **[Events](06_events.md)**
+8. **[Parameters](07_params.md)**
+9. **[Client](07_client.md)**
 
 ## Module Architecture
 
 > **NOTE:**: If you're not familiar with the overall module structure from
-> the SDK modules, please check this [document](https://docs.cosmos.network/master/building-modules/structure.html) as
-> prerequisite reading.
+the SDK modules, please check this [document](https://docs.cosmos.network/master/building-modules/structure.html) as
+prerequisite reading.
 
 ```shell
 evm/

@@ -20,8 +20,8 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/types/tx"
 
-	abci "github.com/cometbft/cometbft/abci/types"
-	"github.com/cometbft/cometbft/proto/tendermint/crypto"
+	abci "github.com/tendermint/tendermint/abci/types"
+	"github.com/tendermint/tendermint/proto/tendermint/crypto"
 
 	"github.com/cosmos/cosmos-sdk/client"
 
@@ -61,6 +61,9 @@ func (QueryClient) GetProof(clientCtx client.Context, storeKey string, key []byt
 	if height <= 2 {
 		return nil, nil, fmt.Errorf("proof queries at height <= 2 are not supported")
 	}
+
+	// Use the IAVL height if a valid tendermint height is passed in.
+	height--
 
 	abciReq := abci.RequestQuery{
 		Path:   fmt.Sprintf("store/%s/key", storeKey),

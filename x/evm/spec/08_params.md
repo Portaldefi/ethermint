@@ -77,8 +77,3 @@ By default, all block configuration fields but `ConstantinopleBlock`, are enable
 | MuirGlacierBlock    | 0                                                                    |
 | BerlinBlock         | 0                                                                    |
 | LondonBlock         | 0                                                                    |
-| ArrowGlacierBlock   | 0                                                                    |
-| GrayGlacierBlock    | 0                                                                    |
-| MergeNetsplitBlock  | 0                                                                    |
-| ShanghaiBlock       | 0                                                                    |
-| CancunBlock.        | 0                                                                    |

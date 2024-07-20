@@ -4,11 +4,6 @@ import (
 	"fmt"
 	"math/big"
 
-	dbm "github.com/cometbft/cometbft-db"
-	abci "github.com/cometbft/cometbft/abci/types"
-	tmlog "github.com/cometbft/cometbft/libs/log"
-	tmrpctypes "github.com/cometbft/cometbft/rpc/core/types"
-	"github.com/cometbft/cometbft/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -17,6 +12,11 @@ import (
 	rpctypes "github.com/evmos/ethermint/rpc/types"
 	ethermint "github.com/evmos/ethermint/types"
 	evmtypes "github.com/evmos/ethermint/x/evm/types"
+	abci "github.com/tendermint/tendermint/abci/types"
+	tmlog "github.com/tendermint/tendermint/libs/log"
+	tmrpctypes "github.com/tendermint/tendermint/rpc/core/types"
+	"github.com/tendermint/tendermint/types"
+	dbm "github.com/tendermint/tm-db"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -31,12 +31,12 @@ func (suite *BackendTestSuite) TestGetTransactionByHash() {
 			Code: 0,
 			Events: []abci.Event{
 				{Type: evmtypes.EventTypeEthereumTx, Attributes: []abci.EventAttribute{
-					{Key: "ethereumTxHash", Value: txHash.Hex()},
-					{Key: "txIndex", Value: "0"},
-					{Key: "amount", Value: "1000"},
-					{Key: "txGasUsed", Value: "21000"},
-					{Key: "txHash", Value: ""},
-					{Key: "recipient", Value: ""},
+					{Key: []byte("ethereumTxHash"), Value: []byte(txHash.Hex())},
+					{Key: []byte("txIndex"), Value: []byte("0")},
+					{Key: []byte("amount"), Value: []byte("1000")},
+					{Key: []byte("txGasUsed"), Value: []byte("21000")},
+					{Key: []byte("txHash"), Value: []byte("")},
+					{Key: []byte("recipient"), Value: []byte("")},
 				}},
 			},
 		},
@@ -283,12 +283,12 @@ func (suite *BackendTestSuite) TestGetTransactionByBlockAndIndex() {
 			Code: 0,
 			Events: []abci.Event{
 				{Type: evmtypes.EventTypeEthereumTx, Attributes: []abci.EventAttribute{
-					{Key: "ethereumTxHash", Value: common.HexToHash(msgEthTx.Hash).Hex()},
-					{Key: "txIndex", Value: "0"},
-					{Key: "amount", Value: "1000"},
-					{Key: "txGasUsed", Value: "21000"},
-					{Key: "txHash", Value: ""},
-					{Key: "recipient", Value: ""},
+					{Key: []byte("ethereumTxHash"), Value: []byte(common.HexToHash(msgEthTx.Hash).Hex())},
+					{Key: []byte("txIndex"), Value: []byte("0")},
+					{Key: []byte("amount"), Value: []byte("1000")},
+					{Key: []byte("txGasUsed"), Value: []byte("21000")},
+					{Key: []byte("txHash"), Value: []byte("")},
+					{Key: []byte("recipient"), Value: []byte("")},
 				}},
 			},
 		},
@@ -563,12 +563,12 @@ func (suite *BackendTestSuite) TestGetTransactionReceipt() {
 					Code: 0,
 					Events: []abci.Event{
 						{Type: evmtypes.EventTypeEthereumTx, Attributes: []abci.EventAttribute{
-							{Key: "txIndex", Value: "0"},
-							{Key: "ethereumTxHash", Value: txHash.Hex()},
-							{Key: "amount", Value: "1000"},
-							{Key: "txGasUsed", Value: "21000"},
-							{Key: "txHash", Value: ""},
-							{Key: "recipient", Value: "0x775b87ef5D82ca211811C1a02CE0fE0CA3a455d7"},
+							{Key: []byte("ethereumTxHash"), Value: []byte(txHash.Hex())},
+							{Key: []byte("txIndex"), Value: []byte("0")},
+							{Key: []byte("amount"), Value: []byte("1000")},
+							{Key: []byte("txGasUsed"), Value: []byte("21000")},
+							{Key: []byte("txHash"), Value: []byte("")},
+							{Key: []byte("recipient"), Value: []byte("0x775b87ef5D82ca211811C1a02CE0fE0CA3a455d7")},
 						}},
 					},
 				},
@@ -595,62 +595,6 @@ func (suite *BackendTestSuite) TestGetTransactionReceipt() {
 			} else {
 				suite.Require().NotEqual(txReceipt, tc.expTxReceipt)
 			}
-		})
-	}
-}
-
-func (suite *BackendTestSuite) TestGetGasUsed() {
-	origin := suite.backend.cfg.JSONRPC.FixRevertGasRefundHeight
-	testCases := []struct {
-		name                     string
-		fixRevertGasRefundHeight int64
-		txResult                 *ethermint.TxResult
-		price                    *big.Int
-		gas                      uint64
-		exp                      uint64
-	}{
-		{
-			"success txResult",
-			1,
-			&ethermint.TxResult{
-				Height:  1,
-				Failed:  false,
-				GasUsed: 53026,
-			},
-			new(big.Int).SetUint64(0),
-			0,
-			53026,
-		},
-		{
-			"fail txResult before cap",
-			2,
-			&ethermint.TxResult{
-				Height:  1,
-				Failed:  true,
-				GasUsed: 53026,
-			},
-			new(big.Int).SetUint64(200000),
-			5000000000000,
-			1000000000000000000,
-		},
-		{
-			"fail txResult after cap",
-			2,
-			&ethermint.TxResult{
-				Height:  3,
-				Failed:  true,
-				GasUsed: 53026,
-			},
-			new(big.Int).SetUint64(200000),
-			5000000000000,
-			53026,
-		},
-	}
-	for _, tc := range testCases {
-		suite.Run(fmt.Sprintf("Case %s", tc.name), func() {
-			suite.backend.cfg.JSONRPC.FixRevertGasRefundHeight = tc.fixRevertGasRefundHeight
-			suite.Require().Equal(tc.exp, suite.backend.GetGasUsed(tc.txResult, tc.price, tc.gas))
-			suite.backend.cfg.JSONRPC.FixRevertGasRefundHeight = origin
 		})
 	}
 }

@@ -42,8 +42,7 @@ func MigrateStore(
 	params.EvmDenom = denom
 	params.ExtraEIPs = extraEIPs.EIPs
 	params.ChainConfig = chainConfig
-	// params.EnableCreate = store.Has(types.ParamStoreKeyEnableCreate)
-	params.EnableCreate = false
+	params.EnableCreate = store.Has(types.ParamStoreKeyEnableCreate)
 	params.EnableCall = store.Has(types.ParamStoreKeyEnableCall)
 	params.AllowUnprotectedTxs = store.Has(types.ParamStoreKeyAllowUnprotectedTxs)
 

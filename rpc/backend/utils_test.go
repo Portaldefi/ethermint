@@ -3,7 +3,7 @@ package backend
 import (
 	"fmt"
 
-	"github.com/cometbft/cometbft/proto/tendermint/crypto"
+	"github.com/tendermint/tendermint/proto/tendermint/crypto"
 )
 
 func mookProofs(num int, withData bool) *crypto.ProofOps {

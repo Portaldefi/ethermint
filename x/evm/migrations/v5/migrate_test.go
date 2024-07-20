@@ -45,7 +45,7 @@ func TestMigrate(t *testing.T) {
 
 	// test that the params have been migrated correctly
 	require.Equal(t, "aphoton", params.EvmDenom)
-	require.False(t, params.EnableCreate)
+	require.True(t, params.EnableCreate)
 	require.True(t, params.EnableCall)
 	require.True(t, params.AllowUnprotectedTxs)
 	require.Equal(t, chainConfig, params.ChainConfig)

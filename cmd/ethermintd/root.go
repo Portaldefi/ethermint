@@ -17,7 +17,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -25,11 +24,10 @@ import (
 	"github.com/spf13/cast"
 	"github.com/spf13/cobra"
 
-	dbm "github.com/cometbft/cometbft-db"
-	tmcfg "github.com/cometbft/cometbft/config"
-	tmcli "github.com/cometbft/cometbft/libs/cli"
-	"github.com/cometbft/cometbft/libs/log"
-	tmlog "github.com/cometbft/cometbft/libs/log"
+	tmcfg "github.com/tendermint/tendermint/config"
+	tmcli "github.com/tendermint/tendermint/libs/cli"
+	tmlog "github.com/tendermint/tendermint/libs/log"
+	dbm "github.com/tendermint/tm-db"
 
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	"github.com/cosmos/cosmos-sdk/client"
@@ -38,6 +36,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/client/rpc"
 	sdkserver "github.com/cosmos/cosmos-sdk/server"
 	servertypes "github.com/cosmos/cosmos-sdk/server/types"
+	"github.com/cosmos/cosmos-sdk/simapp/params"
 	"github.com/cosmos/cosmos-sdk/snapshots"
 	snapshottypes "github.com/cosmos/cosmos-sdk/snapshots/types"
 	"github.com/cosmos/cosmos-sdk/store"
@@ -47,11 +46,7 @@ import (
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"github.com/cosmos/cosmos-sdk/x/crisis"
 	genutilcli "github.com/cosmos/cosmos-sdk/x/genutil/client/cli"
-	"github.com/evmos/ethermint/app/params"
 
-	rosettaCmd "cosmossdk.io/tools/rosetta/cmd"
-	"github.com/cosmos/cosmos-sdk/x/genutil"
-	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
 	"github.com/evmos/ethermint/app"
 	ethermintclient "github.com/evmos/ethermint/client"
 	"github.com/evmos/ethermint/client/debug"
@@ -77,10 +72,10 @@ func NewRootCmd() (*cobra.Command, params.EncodingConfig) {
 		WithLegacyAmino(encodingConfig.Amino).
 		WithInput(os.Stdin).
 		WithAccountRetriever(types.AccountRetriever{}).
-		WithBroadcastMode(flags.FlagBroadcastMode).
+		WithBroadcastMode(flags.BroadcastBlock).
 		WithHomeDir(app.DefaultNodeHome).
 		WithKeyringOptions(hd.EthSecp256k1Option()).
-		WithViper(EnvPrefix).WithLedgerHasProtobuf(true)
+		WithViper(EnvPrefix)
 
 	eip712.SetEncodingConfig(encodingConfig)
 
@@ -118,20 +113,14 @@ func NewRootCmd() (*cobra.Command, params.EncodingConfig) {
 
 	cfg := sdk.GetConfig()
 	cfg.Seal()
-	a := appCreator{encodingConfig}
-	gentxModule := app.ModuleBasics[genutiltypes.ModuleName].(genutil.AppModuleBasic)
+
 	rootCmd.AddCommand(
 		ethermintclient.ValidateChainID(
 			genutilcli.InitCmd(app.ModuleBasics, app.DefaultNodeHome),
 		),
-		genutilcli.CollectGenTxsCmd(banktypes.GenesisBalancesIterator{}, app.DefaultNodeHome, gentxModule.GenTxValidator),
+		genutilcli.CollectGenTxsCmd(banktypes.GenesisBalancesIterator{}, app.DefaultNodeHome),
 		genutilcli.MigrateGenesisCmd(), // TODO: shouldn't this include the local app version instead of the SDK?
-		genutilcli.GenTxCmd(
-			app.ModuleBasics,
-			encodingConfig.TxConfig,
-			banktypes.GenesisBalancesIterator{},
-			app.DefaultNodeHome,
-		),
+		genutilcli.GenTxCmd(app.ModuleBasics, encodingConfig.TxConfig, banktypes.GenesisBalancesIterator{}, app.DefaultNodeHome),
 		genutilcli.ValidateGenesisCmd(app.ModuleBasics),
 		AddGenesisAccountCmd(app.DefaultNodeHome),
 		tmcli.NewCompletionCmd(rootCmd, true),
@@ -140,12 +129,8 @@ func NewRootCmd() (*cobra.Command, params.EncodingConfig) {
 		config.Cmd(),
 	)
 
-	server.AddCommands(
-		rootCmd,
-		server.NewDefaultStartOptions(a.newApp, app.DefaultNodeHome),
-		a.appExport,
-		addModuleInitFlags,
-	)
+	a := appCreator{encodingConfig}
+	server.AddCommands(rootCmd, server.NewDefaultStartOptions(a.newApp, app.DefaultNodeHome), a.appExport, addModuleInitFlags)
 
 	// add keybase, auxiliary RPC, query, and tx child commands
 	rootCmd.AddCommand(
@@ -161,7 +146,7 @@ func NewRootCmd() (*cobra.Command, params.EncodingConfig) {
 	}
 
 	// add rosetta
-	rootCmd.AddCommand(rosettaCmd.RosettaCommand(encodingConfig.InterfaceRegistry, encodingConfig.Codec))
+	rootCmd.AddCommand(sdkserver.RosettaCommand(encodingConfig.InterfaceRegistry, encodingConfig.Codec))
 
 	return rootCmd, encodingConfig
 }
@@ -192,37 +177,6 @@ func queryCommand() *cobra.Command {
 	cmd.PersistentFlags().String(flags.FlagChainID, "", "The network chain ID")
 
 	return cmd
-}
-
-// appExport creates a new simapp (optionally at a given height)
-// and exports state.
-func (a appCreator) appExport(
-	logger log.Logger,
-	db dbm.DB,
-	traceStore io.Writer,
-	height int64,
-	forZeroHeight bool,
-	jailAllowedAddrs []string,
-	appOpts servertypes.AppOptions,
-	modulesToExport []string,
-) (servertypes.ExportedApp, error) {
-	var ethermintApp *app.EthermintApp
-	homePath, ok := appOpts.Get(flags.FlagHome).(string)
-	fmt.Println("Hellow:", homePath)
-	if !ok || homePath == "" {
-		return servertypes.ExportedApp{}, errors.New("application home not set")
-	}
-
-	if height != -1 {
-		ethermintApp = app.NewEthermintApp(logger, db, traceStore, false, map[int64]bool{}, "", uint(1), a.encCfg, appOpts)
-
-		if err := ethermintApp.LoadHeight(height); err != nil {
-			return servertypes.ExportedApp{}, err
-		}
-	} else {
-		ethermintApp = app.NewEthermintApp(logger, db, traceStore, true, map[int64]bool{}, "", uint(1), a.encCfg, appOpts)
-	}
-	return ethermintApp.ExportAppStateAndValidators(forZeroHeight, jailAllowedAddrs)
 }
 
 func txCommand() *cobra.Command {
@@ -293,8 +247,6 @@ func (a appCreator) newApp(logger tmlog.Logger, db dbm.DB, traceStore io.Writer,
 		cast.ToUint32(appOpts.Get(sdkserver.FlagStateSyncSnapshotKeepRecent)),
 	)
 
-	//chainID := cast.ToString(appOpts.Get(flags.FlagChainID))
-
 	ethermintApp := app.NewEthermintApp(
 		logger, db, traceStore, true, skipUpgradeHeights,
 		cast.ToString(appOpts.Get(flags.FlagHome)),
@@ -312,33 +264,32 @@ func (a appCreator) newApp(logger tmlog.Logger, db dbm.DB, traceStore io.Writer,
 		baseapp.SetSnapshot(snapshotStore, snapshotOptions),
 		baseapp.SetIAVLCacheSize(cast.ToInt(appOpts.Get(sdkserver.FlagIAVLCacheSize))),
 		baseapp.SetIAVLDisableFastNode(cast.ToBool(appOpts.Get(sdkserver.FlagDisableIAVLFastNode))),
-		baseapp.SetChainID("ethermint_9000-1"),
 	)
 
 	return ethermintApp
 }
 
-// // appExport creates a new simapp (optionally at a given height)
-// // and exports state.
-// func (a appCreator) appExport(
-// 	logger tmlog.Logger, db dbm.DB, traceStore io.Writer, height int64, forZeroHeight bool, jailAllowedAddrs []string,
-// 	appOpts servertypes.AppOptions,
-// ) (servertypes.ExportedApp, error) {
-// 	var ethermintApp *app.EthermintApp
-// 	homePath, ok := appOpts.Get(flags.FlagHome).(string)
-// 	if !ok || homePath == "" {
-// 		return servertypes.ExportedApp{}, errors.New("application home not set")
-// 	}
+// appExport creates a new simapp (optionally at a given height)
+// and exports state.
+func (a appCreator) appExport(
+	logger tmlog.Logger, db dbm.DB, traceStore io.Writer, height int64, forZeroHeight bool, jailAllowedAddrs []string,
+	appOpts servertypes.AppOptions,
+) (servertypes.ExportedApp, error) {
+	var ethermintApp *app.EthermintApp
+	homePath, ok := appOpts.Get(flags.FlagHome).(string)
+	if !ok || homePath == "" {
+		return servertypes.ExportedApp{}, errors.New("application home not set")
+	}
 
-// 	if height != -1 {
-// 		ethermintApp = app.NewEthermintApp(logger, db, traceStore, false, map[int64]bool{}, "", uint(1), a.encCfg, appOpts)
+	if height != -1 {
+		ethermintApp = app.NewEthermintApp(logger, db, traceStore, false, map[int64]bool{}, "", uint(1), a.encCfg, appOpts)
 
-// 		if err := ethermintApp.LoadHeight(height); err != nil {
-// 			return servertypes.ExportedApp{}, err
-// 		}
-// 	} else {
-// 		ethermintApp = app.NewEthermintApp(logger, db, traceStore, true, map[int64]bool{}, "", uint(1), a.encCfg, appOpts)
-// 	}
+		if err := ethermintApp.LoadHeight(height); err != nil {
+			return servertypes.ExportedApp{}, err
+		}
+	} else {
+		ethermintApp = app.NewEthermintApp(logger, db, traceStore, true, map[int64]bool{}, "", uint(1), a.encCfg, appOpts)
+	}
 
-// 	return ethermintApp.ExportAppStateAndValidators(forZeroHeight, jailAllowedAddrs)
-// }
+	return ethermintApp.ExportAppStateAndValidators(forZeroHeight, jailAllowedAddrs)
+}

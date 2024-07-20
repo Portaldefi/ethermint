@@ -50,7 +50,6 @@ type EVMKeeper interface {
 	ResetTransientGasUsed(ctx sdk.Context)
 	GetTxIndexTransient(ctx sdk.Context) uint64
 	GetParams(ctx sdk.Context) evmtypes.Params
-	IsVirtualFrontierContract(ctx sdk.Context, address common.Address) bool
 }
 
 type protoTxProvider interface {

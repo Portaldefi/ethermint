@@ -3,7 +3,7 @@
 PACKAGES_NOSIMULATION=$(shell go list ./... | grep -v '/simulation')
 PACKAGES_SIMTEST=$(shell go list ./... | grep '/simulation')
 VERSION ?= $(shell echo $(shell git describe --tags `git rev-list --tags="v*" --max-count=1`) | sed 's/^v//')
-TMVERSION := $(shell go list -m github.com/cometbft/cometbft | sed 's:.* ::')
+TMVERSION := $(shell go list -m github.com/tendermint/tendermint | sed 's:.* ::')
 COMMIT := $(shell git log -1 --format='%H')
 LEDGER_ENABLED ?= true
 BINDIR ?= $(GOPATH)/bin
@@ -14,12 +14,6 @@ SIMAPP = ./app
 HTTPS_GIT := https://github.com/evmos/ethermint.git
 PROJECT_NAME = $(shell git remote get-url origin | xargs basename -s .git)
 DOCKER := $(shell which docker)
-NAMESPACE := tharsis
-PROJECT := ethermint
-DOCKER_IMAGE := $(NAMESPACE)/$(PROJECT)
-COMMIT_HASH := $(shell git rev-parse --short=7 HEAD)
-DOCKER_TAG := $(COMMIT_HASH)
-
 # RocksDB is a native dependency, so we don't assume the library is installed.
 # Instead, it must be explicitly enabled and we warn when it is not.
 ENABLE_ROCKSDB ?= false
@@ -72,7 +66,7 @@ ldflags = -X github.com/cosmos/cosmos-sdk/version.Name=ethermint \
 		  -X github.com/cosmos/cosmos-sdk/version.Version=$(VERSION) \
 		  -X github.com/cosmos/cosmos-sdk/version.Commit=$(COMMIT) \
 			-X "github.com/cosmos/cosmos-sdk/version.BuildTags=$(build_tags_comma_sep)" \
-			-X github.com/cometbft/cometbft/version.TMCoreSemVer=$(TMVERSION)
+			-X github.com/tendermint/tendermint/version.TMCoreSemVer=$(TMVERSION)
 
 ifeq ($(ENABLE_ROCKSDB),true)
   BUILD_TAGS += rocksdb_build
@@ -396,9 +390,9 @@ format-fix:
 # NOTE: Link to the tendermintdev/sdk-proto-gen docker images: 
 #       https://hub.docker.com/r/tendermintdev/sdk-proto-gen/tags
 #
-protoVer=0.11.6
-protoImageName=ghcr.io/cosmos/proto-builder:$(protoVer)
-protoImage=$(DOCKER) run --rm -v $(CURDIR):/workspace --workdir /workspace --user 0 $(protoImageName)
+protoVer=v0.7
+protoImageName=tendermintdev/sdk-proto-gen:$(protoVer)
+protoImage=$(DOCKER) run --network host --rm -v $(CURDIR):/workspace --workdir /workspace $(protoImageName)
 # ------
 # NOTE: cosmos/proto-builder image is needed because clang-format is not installed
 #       on the tendermintdev/sdk-proto-gen docker image.
@@ -429,9 +423,9 @@ proto-gen:
 
 
 # TODO: Rethink API docs generation
-proto-swagger-gen:
-	@echo "Generating Protobuf Swagger"
-	$(protoImage) sh ./scripts/protoc-swagger-gen.sh
+# proto-swagger-gen:
+# 	@echo "Generating Protobuf Swagger"
+# 	$(protoImage) sh ./scripts/protoc-swagger-gen.sh
 
 proto-format:
 	@echo "Formatting Protobuf files"

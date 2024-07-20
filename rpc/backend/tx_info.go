@@ -17,11 +17,8 @@ package backend
 
 import (
 	"fmt"
-	"math/big"
 
 	errorsmod "cosmossdk.io/errors"
-	tmrpcclient "github.com/cometbft/cometbft/rpc/client"
-	tmrpctypes "github.com/cometbft/cometbft/rpc/core/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -31,6 +28,7 @@ import (
 	ethermint "github.com/evmos/ethermint/types"
 	evmtypes "github.com/evmos/ethermint/x/evm/types"
 	"github.com/pkg/errors"
+	tmrpctypes "github.com/tendermint/tendermint/rpc/core/types"
 )
 
 // GetTransactionByHash returns the Ethereum format transaction identified by Ethereum transaction hash
@@ -133,17 +131,6 @@ func (b *Backend) getTransactionByHashPending(txHash common.Hash) (*rpctypes.RPC
 	return nil, nil
 }
 
-// GetGasUsed returns gasUsed from transaction
-func (b *Backend) GetGasUsed(res *ethermint.TxResult, price *big.Int, gas uint64) uint64 {
-	// patch gasUsed if tx is reverted and happened before height on which fixed was introduced
-	// to return real gas charged
-	// more info at https://github.com/evmos/ethermint/pull/1557
-	if res.Failed && res.Height < b.cfg.JSONRPC.FixRevertGasRefundHeight {
-		return new(big.Int).Mul(price, new(big.Int).SetUint64(gas)).Uint64()
-	}
-	return res.GasUsed
-}
-
 // GetTransactionReceipt returns the transaction receipt identified by hash.
 func (b *Backend) GetTransactionReceipt(hash common.Hash) (map[string]interface{}, error) {
 	hexTx := hash.Hex()
@@ -154,6 +141,7 @@ func (b *Backend) GetTransactionReceipt(hash common.Hash) (map[string]interface{
 		b.logger.Debug("tx not found", "hash", hexTx, "error", err.Error())
 		return nil, nil
 	}
+
 	resBlock, err := b.TendermintBlockByNumber(rpctypes.BlockNumber(res.Height))
 	if err != nil {
 		b.logger.Debug("block not found", "height", res.Height, "error", err.Error())
@@ -189,6 +177,7 @@ func (b *Backend) GetTransactionReceipt(hash common.Hash) (map[string]interface{
 	} else {
 		status = hexutil.Uint(ethtypes.ReceiptStatusSuccessful)
 	}
+
 	chainID, err := b.ChainID()
 	if err != nil {
 		return nil, err
@@ -231,7 +220,7 @@ func (b *Backend) GetTransactionReceipt(hash common.Hash) (map[string]interface{
 		// They are stored in the chain database.
 		"transactionHash": hash,
 		"contractAddress": nil,
-		"gasUsed":         hexutil.Uint64(b.GetGasUsed(res, txData.GetGasPrice(), txData.GetGas())),
+		"gasUsed":         hexutil.Uint64(res.GasUsed),
 
 		// Inclusion information: These fields provide information about the inclusion of the
 		// transaction corresponding to this receipt.
@@ -270,12 +259,8 @@ func (b *Backend) GetTransactionReceipt(hash common.Hash) (map[string]interface{
 // GetTransactionByBlockHashAndIndex returns the transaction identified by hash and index.
 func (b *Backend) GetTransactionByBlockHashAndIndex(hash common.Hash, idx hexutil.Uint) (*rpctypes.RPCTransaction, error) {
 	b.logger.Debug("eth_getTransactionByBlockHashAndIndex", "hash", hash.Hex(), "index", idx)
-	sc, ok := b.clientCtx.Client.(tmrpcclient.SignClient)
-	if !ok {
-		return nil, errors.New("invalid rpc client")
-	}
 
-	block, err := sc.BlockByHash(b.ctx, hash.Bytes())
+	block, err := b.clientCtx.Client.BlockByHash(b.ctx, hash.Bytes())
 	if err != nil {
 		b.logger.Debug("block not found", "hash", hash.Hex(), "error", err.Error())
 		return nil, nil
@@ -309,7 +294,7 @@ func (b *Backend) GetTransactionByBlockNumberAndIndex(blockNum rpctypes.BlockNum
 
 // GetTxByEthHash uses `/tx_query` to find transaction by ethereum tx hash
 // TODO: Don't need to convert once hashing is fixed on Tendermint
-// https://github.com/cometbft/cometbft/issues/6539
+// https://github.com/tendermint/tendermint/issues/6539
 func (b *Backend) GetTxByEthHash(hash common.Hash) (*ethermint.TxResult, error) {
 	if b.indexer != nil {
 		return b.indexer.GetByTxHash(hash)

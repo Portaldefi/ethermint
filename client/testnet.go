@@ -27,11 +27,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	tmconfig "github.com/cometbft/cometbft/config"
-	tmrand "github.com/cometbft/cometbft/libs/rand"
-	"github.com/cometbft/cometbft/types"
-	tmtime "github.com/cometbft/cometbft/types/time"
 	"github.com/spf13/cobra"
+	tmconfig "github.com/tendermint/tendermint/config"
+	tmrand "github.com/tendermint/tendermint/libs/rand"
+	"github.com/tendermint/tendermint/types"
+	tmtime "github.com/tendermint/tendermint/types/time"
 
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/flags"
@@ -108,7 +108,7 @@ func addTestnetFlagsToCmd(cmd *cobra.Command) {
 		fmt.Sprintf("0.000006%s",
 			ethermint.AttoPhoton),
 		"Minimum gas prices to accept for transactions; All fees in a tx must meet this minimum (e.g. 0.01photino,0.001stake)")
-	cmd.Flags().String(flags.FlagKeyType, string(hd.EthSecp256k1Type), "Key signing algorithm to generate keys for")
+	cmd.Flags().String(flags.FlagKeyAlgorithm, string(hd.EthSecp256k1Type), "Key signing algorithm to generate keys for")
 }
 
 // NewTestnetCmd creates a root testnet command with subcommands to run an in-process testnet or initialize
@@ -161,7 +161,7 @@ Example:
 			args.nodeDaemonHome, _ = cmd.Flags().GetString(flagNodeDaemonHome)
 			args.startingIPAddress, _ = cmd.Flags().GetString(flagStartingIPAddress)
 			args.numValidators, _ = cmd.Flags().GetInt(flagNumValidators)
-			args.algo, _ = cmd.Flags().GetString(flags.FlagKeyType)
+			args.algo, _ = cmd.Flags().GetString(flags.FlagKeyAlgorithm)
 
 			return initTestnetFiles(clientCtx, cmd, serverCtx.Config, mbm, genBalIterator, args)
 		},
@@ -169,7 +169,7 @@ Example:
 
 	addTestnetFlagsToCmd(cmd)
 	cmd.Flags().String(flagNodeDirPrefix, "node", "Prefix the directory name for each node with (node results in node0, node1, ...)")
-	cmd.Flags().String(flagNodeDaemonHome, "ethermintd", "Home directory of the node's daemon configuration")
+	cmd.Flags().String(flagNodeDaemonHome, "evmosd", "Home directory of the node's daemon configuration")
 	cmd.Flags().String(flagStartingIPAddress,
 		"192.168.0.1",
 		"Starting IP address (192.168.0.1 results in persistent peers list ID0@192.168.0.1:46656, ID1@192.168.0.2:46656, ...)")
@@ -196,7 +196,7 @@ Example:
 			args.chainID, _ = cmd.Flags().GetString(flags.FlagChainID)
 			args.minGasPrices, _ = cmd.Flags().GetString(sdkserver.FlagMinGasPrices)
 			args.numValidators, _ = cmd.Flags().GetInt(flagNumValidators)
-			args.algo, _ = cmd.Flags().GetString(flags.FlagKeyType)
+			args.algo, _ = cmd.Flags().GetString(flags.FlagKeyAlgorithm)
 			args.enableLogging, _ = cmd.Flags().GetBool(flagEnableLogging)
 			args.rpcAddress, _ = cmd.Flags().GetString(flagRPCAddress)
 			args.apiAddress, _ = cmd.Flags().GetString(flagAPIAddress)
@@ -491,11 +491,7 @@ func collectGenFiles(
 			return err
 		}
 
-		nodeAppState, err := genutil.GenAppStateFromConfig(
-			clientCtx.Codec, clientCtx.TxConfig,
-			nodeConfig, initCfg, *genDoc, genBalIterator,
-			genutiltypes.DefaultMessageValidator,
-		)
+		nodeAppState, err := genutil.GenAppStateFromConfig(clientCtx.Codec, clientCtx.TxConfig, nodeConfig, initCfg, *genDoc, genBalIterator)
 		if err != nil {
 			return err
 		}

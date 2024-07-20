@@ -150,7 +150,7 @@ func (args *TransactionArgs) ToTransaction() *MsgEthereumTx {
 		}
 	}
 
-	anyData, err := PackTxData(data)
+	any, err := PackTxData(data)
 	if err != nil {
 		return nil
 	}
@@ -160,7 +160,7 @@ func (args *TransactionArgs) ToTransaction() *MsgEthereumTx {
 	}
 
 	msg := MsgEthereumTx{
-		Data: anyData,
+		Data: any,
 		From: from,
 	}
 	msg.Hash = msg.AsTransaction().Hash().Hex()

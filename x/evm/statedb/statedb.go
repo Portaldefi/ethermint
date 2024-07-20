@@ -26,7 +26,6 @@ import (
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
-	evmtypes "github.com/evmos/ethermint/x/evm/types"
 )
 
 // revision is the identifier of a version of state.
@@ -213,7 +212,7 @@ func (s *StateDB) HasSuicided(addr common.Address) bool {
 // AddPreimage performs a no-op since the EnablePreimageRecording flag is disabled
 // on the vm.Config during state transitions. No store trie preimages are written
 // to the database.
-func (s *StateDB) AddPreimage(_ common.Hash, _ []byte) {}
+func (s *StateDB) AddPreimage(hash common.Hash, preimage []byte) {}
 
 // getStateObject retrieves a state object given by the address, returning nil if
 // the object is not found.
@@ -453,14 +452,6 @@ func (s *StateDB) RevertToSnapshot(revid int) {
 // the StateDB object should be discarded after committed.
 func (s *StateDB) Commit() error {
 	for _, addr := range s.journal.sortedDirties() {
-		if s.keeper.IsVirtualFrontierContract(s.ctx, addr) {
-			// regular EVM state transition should not be able to access or make change to the virtual frontier contract
-			return errorsmod.Wrapf(
-				evmtypes.ErrProhibitedAccessingVirtualFrontierContract,
-				"can not access or make change to frontier contract address %s", addr,
-			)
-		}
-
 		obj := s.stateObjects[addr]
 		if obj.suicided {
 			if err := s.keeper.DeleteAccount(s.ctx, obj.Address()); err != nil {

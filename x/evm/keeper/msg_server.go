@@ -21,12 +21,10 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/evmos/ethermint/utils"
-
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 
-	tmbytes "github.com/cometbft/cometbft/libs/bytes"
-	tmtypes "github.com/cometbft/cometbft/types"
+	tmbytes "github.com/tendermint/tendermint/libs/bytes"
+	tmtypes "github.com/tendermint/tendermint/types"
 
 	errorsmod "cosmossdk.io/errors"
 	"github.com/armon/go-metrics"
@@ -43,7 +41,7 @@ var _ types.MsgServer = &Keeper{}
 // so that it can implements and call the StateDB methods without receiving it as a function
 // parameter.
 func (k *Keeper) EthereumTx(goCtx context.Context, msg *types.MsgEthereumTx) (*types.MsgEthereumTxResponse, error) {
-	ctx := sdk.UnwrapSDKContext(goCtx) // this context already has zero gas config, set by AnteHandler
+	ctx := sdk.UnwrapSDKContext(goCtx)
 
 	sender := msg.From
 	tx := msg.AsTransaction()
@@ -58,7 +56,7 @@ func (k *Keeper) EthereumTx(goCtx context.Context, msg *types.MsgEthereumTx) (*t
 		labels = append(labels, telemetry.NewLabel("execution", "call"))
 	}
 
-	response, err := k.ApplyTransaction(ctx, msg)
+	response, err := k.ApplyTransaction(ctx, tx)
 	if err != nil {
 		return nil, errorsmod.Wrap(err, "failed to apply transaction")
 	}
@@ -155,13 +153,6 @@ func (k *Keeper) UpdateParams(goCtx context.Context, req *types.MsgUpdateParams)
 	}
 
 	ctx := sdk.UnwrapSDKContext(goCtx)
-
-	if utils.IsOneOfDymensionChains(ctx) {
-		if req.Params.EnableCreate {
-			return nil, errorsmod.Wrap(govtypes.ErrInvalidProposalContent, "Enable Create is not allowed")
-		}
-	}
-
 	if err := k.SetParams(ctx, req.Params); err != nil {
 		return nil, err
 	}

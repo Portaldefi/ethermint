@@ -35,7 +35,6 @@ import (
 	"github.com/evmos/ethermint/types"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 )
@@ -107,23 +106,30 @@ func newMsgEthereumTx(
 	}
 
 	switch {
-	case gasTipCap != nil && gasFeeCap != nil:
-		gasTipCap := sdkmath.NewIntFromBigInt(gasTipCap)
-		gasFeeCap := sdkmath.NewIntFromBigInt(gasFeeCap)
+	case accesses == nil:
+		txData = &LegacyTx{
+			Nonce:    nonce,
+			To:       toAddr,
+			Amount:   amt,
+			GasLimit: gasLimit,
+			GasPrice: gp,
+			Data:     input,
+		}
+	case accesses != nil && gasFeeCap != nil && gasTipCap != nil:
+		gtc := sdkmath.NewIntFromBigInt(gasTipCap)
+		gfc := sdkmath.NewIntFromBigInt(gasFeeCap)
 
 		txData = &DynamicFeeTx{
 			ChainID:   cid,
-			Amount:    amt,
-			To:        toAddr,
-			GasTipCap: &gasTipCap,
-			GasFeeCap: &gasFeeCap,
 			Nonce:     nonce,
+			To:        toAddr,
+			Amount:    amt,
 			GasLimit:  gasLimit,
+			GasTipCap: &gtc,
+			GasFeeCap: &gfc,
 			Data:      input,
 			Accesses:  NewAccessList(accesses),
 		}
-
-		break
 	case accesses != nil:
 		txData = &AccessListTx{
 			ChainID:  cid,
@@ -135,17 +141,7 @@ func newMsgEthereumTx(
 			Data:     input,
 			Accesses: NewAccessList(accesses),
 		}
-
-		break
 	default:
-		txData = &LegacyTx{
-			To:       toAddr,
-			Amount:   amt,
-			GasPrice: gp,
-			Nonce:    nonce,
-			GasLimit: gasLimit,
-			Data:     input,
-		}
 	}
 
 	dataAny, err := PackTxData(txData)
@@ -200,16 +196,9 @@ func (msg MsgEthereumTx) ValidateBasic() error {
 		return errorsmod.Wrap(err, "failed to unpack tx data")
 	}
 
-	gas := txData.GetGas()
-
 	// prevent txs with 0 gas to fill up the mempool
-	if gas == 0 {
+	if txData.GetGas() == 0 {
 		return errorsmod.Wrap(ErrInvalidGasLimit, "gas limit must not be zero")
-	}
-
-	// prevent gas limit from overflow
-	if g := new(big.Int).SetUint64(gas); !g.IsInt64() {
-		return errorsmod.Wrap(ErrGasOverflow, "gas limit must be less than math.MaxInt64")
 	}
 
 	if err := txData.Validate(); err != nil {
@@ -336,42 +325,7 @@ func (msg MsgEthereumTx) AsTransaction() *ethtypes.Transaction {
 
 // AsMessage creates an Ethereum core.Message from the msg fields
 func (msg MsgEthereumTx) AsMessage(signer ethtypes.Signer, baseFee *big.Int) (core.Message, error) {
-	txData, err := UnpackTxData(msg.Data)
-	if err != nil {
-		return nil, err
-	}
-
-	gasPrice, gasFeeCap, gasTipCap := txData.GetGasPrice(), txData.GetGasFeeCap(), txData.GetGasTipCap()
-	if baseFee != nil {
-		gasPrice = math.BigMin(gasPrice.Add(gasTipCap, baseFee), gasFeeCap)
-	}
-	var from common.Address
-	if len(msg.From) > 0 {
-		// user can't set arbitrary value in `From` field in transaction,
-		// the SigVerify ante handler will verify the signature and recover
-		// the sender address and populate the `From` field, so the other code can
-		// use it directly when available.
-		from = common.HexToAddress(msg.From)
-	} else {
-		// heavy path
-		from, err = signer.Sender(msg.AsTransaction())
-		if err != nil {
-			return nil, err
-		}
-	}
-	ethMsg := ethtypes.NewMessage(
-		from,
-		txData.GetTo(),
-		txData.GetNonce(),
-		txData.GetValue(),
-		txData.GetGas(),
-		gasPrice, gasFeeCap, gasTipCap,
-		txData.GetData(),
-		txData.GetAccessList(),
-		false,
-	)
-
-	return ethMsg, nil
+	return msg.AsTransaction().AsMessage(signer, baseFee)
 }
 
 // GetSender extracts the sender address from the signature values using the latest signer for the given chainID.
@@ -447,7 +401,7 @@ func (m MsgUpdateParams) GetSigners() []sdk.AccAddress {
 // ValidateBasic does a sanity check of the provided data
 func (m *MsgUpdateParams) ValidateBasic() error {
 	if _, err := sdk.AccAddressFromBech32(m.Authority); err != nil {
-		return errorsmod.Wrap(err, "invalid authority address")
+		return errortypes.Wrap(err, "invalid authority address")
 	}
 
 	return m.Params.Validate()

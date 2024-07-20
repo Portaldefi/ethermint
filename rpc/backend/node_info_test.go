@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/big"
 
-	tmrpcclient "github.com/cometbft/cometbft/rpc/client"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/ethereum/go-ethereum/common"
@@ -13,7 +12,7 @@ import (
 	"github.com/evmos/ethermint/rpc/backend/mocks"
 	ethermint "github.com/evmos/ethermint/types"
 	"github.com/spf13/viper"
-	"google.golang.org/grpc/metadata"
+	tmrpcclient "github.com/tendermint/tendermint/rpc/client"
 )
 
 func (suite *BackendTestSuite) TestRPCMinGasPrice() {
@@ -248,12 +247,10 @@ func (suite *BackendTestSuite) TestSetEtherbase() {
 		{
 			"fail - error querying for account ",
 			func() {
-				var header metadata.MD
 				client := suite.backend.clientCtx.Client.(*mocks.Client)
 				queryClient := suite.backend.queryClient.QueryClient.(*mocks.EVMQueryClient)
 				RegisterStatus(client)
 				RegisterValidatorAccount(queryClient, suite.acc)
-				RegisterParams(queryClient, &header, 1)
 				c := sdk.NewDecCoin("aphoton", sdk.NewIntFromBigInt(big.NewInt(1)))
 				suite.backend.cfg.SetMinGasPrices(sdk.DecCoins{c})
 				delAddr, _ := suite.backend.GetCoinbase()

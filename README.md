@@ -38,20 +38,25 @@ parent:
   </a>
 </div>
 
-> [!WARNING]
-> Evmos, the team behind Ethermint, has fully shifted its focus to [Evmos](https://github.com/evmos/evmos), where we
-> continue to build interoperability solutions for the future!
-> As a result, this repository is no longer maintained for that reason and all relevant code has been migrated.
->
-> **NOTE: If you are interested in using this software** email us at [evmos-sdk@evmos.org](mailto:evmos-sdk@evmos.org) with copy to [legal@thars.is](mailto:legal@thars.is)
+Ethermint is a scalable and interoperable Ethereum library, built on Proof-of-Stake with fast-finality using the [Cosmos SDK](https://github.com/cosmos/cosmos-sdk/) which runs on top of [Tendermint Core](https://github.com/tendermint/tendermint) consensus engine.
 
-## About
+**Note**: Requires [Go 1.19+](https://golang.org/dl/)
 
-Ethermint is a scalable and interoperable Ethereum library, built on Proof-of-Stake with fast-finality using the [Cosmos SDK](https://github.com/cosmos/cosmos-sdk/) which runs on top of [Tendermint Core](https://github.com/cometbft/cometbft) consensus engine.
+## Installation
 
-## Careers
+For prerequisites and detailed build instructions please read the Evmos [Installation](https://docs.evmos.org/validators/quickstart/installation.html) instructions. Once the dependencies are installed, run:
 
-See our open positions on [Greenhouse](https://evmos.org/careers).
+```bash
+make install
+```
+
+Or check out the latest [release](https://github.com/evmos/ethermint/releases).
+
+## Quick Start
+
+To learn how Ethermint works from a high-level perspective, go to the [Introduction](https://docs.evmos.org/about/intro/overview.html) section from the documentation. You can also check the instructions to [Run a Node](https://docs.evmos.org/validators/quickstart/run_node.html).
+
+For an example on how Ethermint can be used on any Cosmos-SDK chain, please refer to [Evmos](https://www.github.com/tharsis/evmos).
 
 ## Community
 
@@ -60,4 +65,14 @@ The following chat channels and forums are a great spot to ask questions about E
 - [Evmos Twitter](https://twitter.com/EvmosOrg)
 - [Evmos Discord](https://discord.gg/trje9XuAmy)
 - [Evmos Telegram](https://t.me/EvmosOrg)
-- [Altiplanic Twitter](https://twitter.com/Altiplanic_io)
+- [Tharsis Twitter](https://twitter.com/TharsisHQ)
+
+## Contributing
+
+Looking for a good place to start contributing? Check out some [`good first issues`](https://github.com/evmos/ethermint/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22).
+
+For additional instructions, standards and style guides, please refer to the [Contributing](./CONTRIBUTING.md) document.
+
+## Careers
+
+See our open positions on [Greenhouse](https://boards.eu.greenhouse.io/evmos).

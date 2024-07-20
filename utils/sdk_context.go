@@ -1,9 +1,10 @@
 package utils
 
 import (
+	"strings"
+
 	storetypes "github.com/cosmos/cosmos-sdk/store/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"strings"
 )
 
 // UseZeroGasConfig set the gas config to zero for both KV and TransientKV store.

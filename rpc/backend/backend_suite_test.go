@@ -7,9 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	dbm "github.com/cometbft/cometbft-db"
+	dbm "github.com/tendermint/tm-db"
 
-	tmrpctypes "github.com/cometbft/cometbft/rpc/core/types"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	"github.com/cosmos/cosmos-sdk/server"
@@ -17,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/suite"
+	tmrpctypes "github.com/tendermint/tendermint/rpc/core/types"
 
 	"github.com/evmos/ethermint/app"
 	"github.com/evmos/ethermint/crypto/ethsecp256k1"

@@ -16,8 +16,7 @@
 package keeper
 
 import (
-	abci "github.com/cometbft/cometbft/abci/types"
-	"github.com/evmos/ethermint/utils"
+	abci "github.com/tendermint/tendermint/abci/types"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
@@ -25,26 +24,14 @@ import (
 )
 
 // BeginBlock sets the sdk Context and EIP155 chain id to the Keeper.
-func (k *Keeper) BeginBlock(ctx sdk.Context, _ abci.RequestBeginBlock) {
+func (k *Keeper) BeginBlock(ctx sdk.Context, req abci.RequestBeginBlock) {
 	k.WithChainID(ctx)
-
-	if utils.IsEthermintDevChain(ctx) {
-		// trigger VFBC registration on Ethermint devnet for development purpose
-
-		cacheCtx, commitFunc := ctx.CacheContext()
-		err := k.DeployVirtualFrontierBankContractForAllBankDenomMetadataRecords(cacheCtx, nil)
-		if err != nil {
-			k.Logger(ctx).Error("failed to deploy VFBC contract for all bank denom metadata records", "error", err)
-		} else {
-			commitFunc()
-		}
-	}
 }
 
 // EndBlock also retrieves the bloom filter value from the transient store and commits it to the
 // KVStore. The EVM end block logic doesn't update the validator set, thus it returns
 // an empty slice.
-func (k *Keeper) EndBlock(ctx sdk.Context, _ abci.RequestEndBlock) []abci.ValidatorUpdate {
+func (k *Keeper) EndBlock(ctx sdk.Context, req abci.RequestEndBlock) []abci.ValidatorUpdate {
 	// Gas costs are handled within msg handler so costs should be ignored
 	infCtx := ctx.WithGasMeter(sdk.NewInfiniteGasMeter())
 

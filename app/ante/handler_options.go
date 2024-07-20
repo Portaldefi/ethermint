@@ -24,8 +24,8 @@ import (
 	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 
-	ibcante "github.com/cosmos/ibc-go/v7/modules/core/ante"
-	ibckeeper "github.com/cosmos/ibc-go/v7/modules/core/keeper"
+	ibcante "github.com/cosmos/ibc-go/v6/modules/core/ante"
+	ibckeeper "github.com/cosmos/ibc-go/v6/modules/core/keeper"
 
 	evmtypes "github.com/evmos/ethermint/x/evm/types"
 )
@@ -44,7 +44,6 @@ type HandlerOptions struct {
 	MaxTxGasWanted         uint64
 	ExtensionOptionChecker ante.ExtensionOptionChecker
 	TxFeeChecker           ante.TxFeeChecker
-	DisabledAuthzMsgs      []string
 }
 
 func (options HandlerOptions) validate() error {
@@ -75,7 +74,6 @@ func newEthAnteHandler(options HandlerOptions) sdk.AnteHandler {
 		NewEthSigVerificationDecorator(options.EvmKeeper),
 		NewEthAccountVerificationDecorator(options.AccountKeeper, options.EvmKeeper),
 		NewCanTransferDecorator(options.EvmKeeper),
-		NewVirtualFrontierContractDecorator(options.EvmKeeper), // prevent transfer to virtual frontier contract
 		NewEthGasConsumeDecorator(options.EvmKeeper, options.MaxTxGasWanted),
 		NewEthIncrementSenderSequenceDecorator(options.AccountKeeper), // innermost AnteDecorator.
 		NewGasWantedDecorator(options.EvmKeeper, options.FeeMarketKeeper),
@@ -86,8 +84,6 @@ func newEthAnteHandler(options HandlerOptions) sdk.AnteHandler {
 func newCosmosAnteHandler(options HandlerOptions) sdk.AnteHandler {
 	return sdk.ChainAnteDecorators(
 		RejectMessagesDecorator{}, // reject MsgEthereumTxs
-		// disable the Msg types that cannot be included on an authz.MsgExec msgs field
-		NewAuthzLimiterDecorator(options.DisabledAuthzMsgs),
 		ante.NewSetUpContextDecorator(),
 		ante.NewExtensionOptionsDecorator(options.ExtensionOptionChecker),
 		ante.NewValidateBasicDecorator(),

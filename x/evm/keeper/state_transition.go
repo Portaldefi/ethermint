@@ -17,11 +17,8 @@ package keeper
 
 import (
 	"math/big"
-	"time"
 
-	"github.com/evmos/ethermint/x/evm/vm/geth"
-
-	tmtypes "github.com/cometbft/cometbft/types"
+	tmtypes "github.com/tendermint/tendermint/types"
 
 	errorsmod "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -149,7 +146,7 @@ func (k Keeper) GetHashFn(ctx sdk.Context) vm.GetHashFunc {
 // returning.
 //
 // For relevant discussion see: https://github.com/cosmos/cosmos-sdk/discussions/9072
-func (k *Keeper) ApplyTransaction(ctx sdk.Context, msgEth *types.MsgEthereumTx) (*types.MsgEthereumTxResponse, error) {
+func (k *Keeper) ApplyTransaction(ctx sdk.Context, tx *ethtypes.Transaction) (*types.MsgEthereumTxResponse, error) {
 	var (
 		bloom        *big.Int
 		bloomReceipt ethtypes.Bloom
@@ -159,12 +156,11 @@ func (k *Keeper) ApplyTransaction(ctx sdk.Context, msgEth *types.MsgEthereumTx) 
 	if err != nil {
 		return nil, errorsmod.Wrap(err, "failed to load evm config")
 	}
-	ethTx := msgEth.AsTransaction()
-	txConfig := k.TxConfig(ctx, ethTx.Hash())
+	txConfig := k.TxConfig(ctx, tx.Hash())
 
 	// get the signer according to the chain rules from the config and block height
 	signer := ethtypes.MakeSigner(cfg.ChainConfig, big.NewInt(ctx.BlockHeight()))
-	msg, err := msgEth.AsMessage(signer, cfg.BaseFee)
+	msg, err := tx.AsMessage(signer, cfg.BaseFee)
 	if err != nil {
 		return nil, errorsmod.Wrap(err, "failed to return ethereum transaction as core message")
 	}
@@ -183,9 +179,6 @@ func (k *Keeper) ApplyTransaction(ctx sdk.Context, msgEth *types.MsgEthereumTx) 
 	// pass true to commit the StateDB
 	res, err := k.ApplyMessageWithConfig(tmpCtx, msg, nil, true, cfg, txConfig)
 	if err != nil {
-		// when a transaction contains multiple msg, as long as one of the msg fails
-		// all gas will be deducted. so is not msg.Gas()
-		k.ResetGasMeterAndConsumeGas(ctx, ctx.GasMeter().Limit())
 		return nil, errorsmod.Wrap(err, "failed to apply ethereum core message")
 	}
 
@@ -213,7 +206,7 @@ func (k *Keeper) ApplyTransaction(ctx sdk.Context, msgEth *types.MsgEthereumTx) 
 	}
 
 	receipt := &ethtypes.Receipt{
-		Type:              ethTx.Type(),
+		Type:              tx.Type(),
 		PostState:         nil, // TODO: intermediate state root
 		CumulativeGasUsed: cumulativeGasUsed,
 		Bloom:             bloomReceipt,
@@ -381,7 +374,7 @@ func (k *Keeper) ApplyMessageWithConfig(ctx sdk.Context,
 		ret, _, leftoverGas, vmErr = evm.Create(sender, msg.Data(), leftoverGas, msg.Value())
 		stateDB.SetNonce(sender.Address(), msg.Nonce()+1)
 	} else {
-		ret, leftoverGas, vmErr = k.proxiedEvmCall(ctx, evm, stateDB, sender, *msg.To(), msg.Data(), leftoverGas, msg.Value())
+		ret, leftoverGas, vmErr = evm.Call(sender, *msg.To(), msg.Data(), leftoverGas, msg.Value())
 	}
 
 	refundQuotient := params.RefundQuotient
@@ -419,10 +412,6 @@ func (k *Keeper) ApplyMessageWithConfig(ctx sdk.Context,
 	minGasMultiplier := k.GetMinGasMultiplier(ctx)
 	minimumGasUsed := gasLimit.Mul(minGasMultiplier)
 
-	if !minimumGasUsed.TruncateInt().IsUint64() {
-		return nil, errorsmod.Wrapf(types.ErrGasOverflow, "minimumGasUsed(%s) is not a uint64", minimumGasUsed.TruncateInt().String())
-	}
-
 	if msg.Gas() < leftoverGas {
 		return nil, errorsmod.Wrapf(types.ErrGasOverflow, "message gas limit < leftover gas (%d < %d)", msg.Gas(), leftoverGas)
 	}
@@ -438,63 +427,4 @@ func (k *Keeper) ApplyMessageWithConfig(ctx sdk.Context,
 		Logs:    types.NewLogsFromEth(stateDB.Logs()),
 		Hash:    txConfig.TxHash.Hex(),
 	}, nil
-}
-
-// proxiedEvmCall is the proxied method of the EVM::Call method.
-// It is used to intercept the call request, make decision before actual invoking call to the EVM::Call.
-// If the target is a Virtual Frontier Contract, the call will be redirected to corresponding handler,
-// instead of invoking actual EVM execution.
-func (k *Keeper) proxiedEvmCall(ctx sdk.Context, evm evm.EVM, stateDB vm.StateDB, caller vm.ContractRef, addr common.Address, input []byte, gas uint64, value *big.Int) (ret []byte, leftOverGas uint64, vmErr error) {
-	var vfcExecResult *types.VFCExecutionResult
-
-	defer func(startGas uint64, startTime time.Time) {
-		// when having VFC exec result, we build the result based on the VFC exec result
-		if vfcExecResult != nil {
-			// CONTRACT: all the named return value must not be set before this
-			// and can only be set by the following statement
-			_, ret, _, leftOverGas, vmErr = vfcExecResult.GetDetailedResult(startGas)
-
-			// capture end tracing if debugging is enabled
-			vmCfg := evm.Config()
-			if vmCfg.Debug {
-				vmCfg.Tracer.CaptureEnd(ret, startGas-leftOverGas, time.Since(startTime), vmErr)
-				// Note: calls to CaptureStart had been added bellow.
-			}
-		}
-	}(gas, time.Now())
-
-	if k.IsVirtualFrontierContract(ctx, addr) {
-		vfContract := k.GetVirtualFrontierContract(ctx, addr)
-
-		// simulate the top call frame when tracing a VFC call
-		vmCfg := evm.Config()
-		if vmCfg.Debug {
-			vmCfg.Tracer.CaptureStart(evm.(*geth.EVM).EVM, caller.Address(), addr, false, input, gas, value)
-		}
-
-		if vfContract == nil {
-			vfcExecResult = types.NewExecVFCError(types.ErrVMExecution.Wrapf("virtual frontier contract %s could not be found", addr.String()))
-		} else if !vfContract.Active {
-			vfcExecResult = types.NewExecVFCError(types.ErrVMExecution.Wrapf("the virtual frontier contract %s is not active", addr.String()))
-		} else {
-			switch vfContract.Type {
-			case types.VFC_TYPE_BANK:
-				vfcExecResult = k.evmCallVirtualFrontierBankContract(ctx, stateDB, caller.Address(), vfContract, input, gas, value)
-
-				break
-			default:
-				vfcExecResult = types.NewExecVFCError(types.ErrVMExecution.Wrapf("virtual frontier contract type %d is not supported", vfContract.Type))
-
-				break
-			}
-		}
-
-		return
-	}
-
-	if vfcExecResult != nil {
-		panic("invalid state: falling to EVM call from Virtual Frontier Contract call")
-	}
-
-	return evm.Call(caller, addr, input, gas, value)
 }

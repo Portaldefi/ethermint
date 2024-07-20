@@ -23,31 +23,47 @@ import (
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
+	"github.com/cosmos/cosmos-sdk/simapp"
 	"github.com/cosmos/cosmos-sdk/testutil/mock"
-	simtestutil "github.com/cosmos/cosmos-sdk/testutil/sims"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 
-	dbm "github.com/cometbft/cometbft-db"
-	abci "github.com/cometbft/cometbft/abci/types"
-	"github.com/cometbft/cometbft/libs/log"
-	tmtypes "github.com/cometbft/cometbft/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/evmos/ethermint/encoding"
+	abci "github.com/tendermint/tendermint/abci/types"
+	"github.com/tendermint/tendermint/libs/log"
+	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
+	tmtypes "github.com/tendermint/tendermint/types"
+	dbm "github.com/tendermint/tm-db"
 )
 
 // DefaultConsensusParams defines the default Tendermint consensus params used in
 // EthermintApp testing.
-var DefaultConsensusParams = simtestutil.DefaultConsensusParams
+var DefaultConsensusParams = &abci.ConsensusParams{
+	Block: &abci.BlockParams{
+		MaxBytes: 200000,
+		MaxGas:   -1, // no limit
+	},
+	Evidence: &tmproto.EvidenceParams{
+		MaxAgeNumBlocks: 302400,
+		MaxAgeDuration:  504 * time.Hour, // 3 weeks is the max duration
+		MaxBytes:        10000,
+	},
+	Validator: &tmproto.ValidatorParams{
+		PubKeyTypes: []string{
+			tmtypes.ABCIPubKeyTypeEd25519,
+		},
+	},
+}
 
 // Setup initializes a new EthermintApp. A Nop logger is set in EthermintApp.
-func Setup(isCheckTx bool, patchGenesis func(*EthermintApp, GenesisState) GenesisState) *EthermintApp {
+func Setup(isCheckTx bool, patchGenesis func(*EthermintApp, simapp.GenesisState) simapp.GenesisState) *EthermintApp {
 	return SetupWithDB(isCheckTx, patchGenesis, dbm.NewMemDB())
 }
 
 // SetupWithDB initializes a new EthermintApp. A Nop logger is set in EthermintApp.
-func SetupWithDB(isCheckTx bool, patchGenesis func(*EthermintApp, GenesisState) GenesisState, db dbm.DB) *EthermintApp {
+func SetupWithDB(isCheckTx bool, patchGenesis func(*EthermintApp, simapp.GenesisState) simapp.GenesisState, db dbm.DB) *EthermintApp {
 	app := NewEthermintApp(log.NewNopLogger(),
 		db,
 		nil,
@@ -56,7 +72,7 @@ func SetupWithDB(isCheckTx bool, patchGenesis func(*EthermintApp, GenesisState) 
 		DefaultNodeHome,
 		5,
 		encoding.MakeConfig(ModuleBasics),
-		simtestutil.EmptyAppOptions{})
+		simapp.EmptyAppOptions{})
 	if !isCheckTx {
 		// init chain must be called to stop deliverState from being nil
 		genesisState := NewTestGenesisState(app.AppCodec())
@@ -84,7 +100,7 @@ func SetupWithDB(isCheckTx bool, patchGenesis func(*EthermintApp, GenesisState) 
 }
 
 // NewTestGenesisState generate genesis state with single validator
-func NewTestGenesisState(codec codec.Codec) GenesisState {
+func NewTestGenesisState(codec codec.Codec) simapp.GenesisState {
 	privVal := mock.NewPV()
 	pubKey, err := privVal.GetPubKey()
 	if err != nil {
@@ -102,14 +118,14 @@ func NewTestGenesisState(codec codec.Codec) GenesisState {
 		Coins:   sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(100000000000000))),
 	}
 
-	genesisState := NewDefaultGenesisState(codec)
+	genesisState := NewDefaultGenesisState()
 	return genesisStateWithValSet(codec, genesisState, valSet, []authtypes.GenesisAccount{acc}, balance)
 }
 
-func genesisStateWithValSet(codec codec.Codec, genesisState GenesisState,
+func genesisStateWithValSet(codec codec.Codec, genesisState simapp.GenesisState,
 	valSet *tmtypes.ValidatorSet, genAccs []authtypes.GenesisAccount,
 	balances ...banktypes.Balance,
-) GenesisState {
+) simapp.GenesisState {
 	// set genesis accounts
 	authGenesis := authtypes.NewGenesisState(authtypes.DefaultParams(), genAccs)
 	genesisState[authtypes.ModuleName] = codec.MustMarshalJSON(authGenesis)
@@ -166,7 +182,7 @@ func genesisStateWithValSet(codec codec.Codec, genesisState GenesisState,
 	})
 
 	// update total supply
-	bankGenesis := banktypes.NewGenesisState(banktypes.DefaultGenesisState().Params, balances, totalSupply, []banktypes.Metadata{}, nil)
+	bankGenesis := banktypes.NewGenesisState(banktypes.DefaultGenesisState().Params, balances, totalSupply, []banktypes.Metadata{})
 	genesisState[banktypes.ModuleName] = codec.MustMarshalJSON(bankGenesis)
 
 	return genesisState

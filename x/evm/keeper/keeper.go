@@ -19,7 +19,6 @@ import (
 	"math/big"
 
 	errorsmod "cosmossdk.io/errors"
-	"github.com/cometbft/cometbft/libs/log"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/store/prefix"
 	storetypes "github.com/cosmos/cosmos-sdk/store/types"
@@ -30,6 +29,7 @@ import (
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/tendermint/tendermint/libs/log"
 
 	ethermint "github.com/evmos/ethermint/types"
 	"github.com/evmos/ethermint/x/evm/statedb"
@@ -285,8 +285,6 @@ func (k *Keeper) GetAccountWithoutBalance(ctx sdk.Context, addr common.Address) 
 	ethAcct, ok := acct.(ethermint.EthAccountI)
 	if ok {
 		codeHash = ethAcct.GetCodeHash().Bytes()
-	} else if k.IsVirtualFrontierContract(ctx, addr) {
-		codeHash = types.VFBCCodeHash
 	}
 
 	return &statedb.Account{

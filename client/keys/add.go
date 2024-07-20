@@ -18,7 +18,6 @@ package keys
 import (
 	"bufio"
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -76,7 +75,7 @@ func RunAddCmd(ctx client.Context, cmd *cobra.Command, args []string, inBuf *buf
 	interactive, _ := cmd.Flags().GetBool(flagInteractive)
 	noBackup, _ := cmd.Flags().GetBool(flagNoBackup)
 	useLedger, _ := cmd.Flags().GetBool(flags.FlagUseLedger)
-	algoStr, _ := cmd.Flags().GetString(flags.FlagKeyType)
+	algoStr, _ := cmd.Flags().GetString(flags.FlagKeyAlgorithm)
 
 	showMnemonic := !noBackup
 	kb := ctx.Keyring
@@ -197,8 +196,8 @@ func RunAddCmd(ctx client.Context, cmd *cobra.Command, args []string, inBuf *buf
 	// Get bip39 mnemonic
 	var mnemonic, bip39Passphrase string
 
-	recoverKey, _ := cmd.Flags().GetBool(flagRecover)
-	if recoverKey {
+	recover, _ := cmd.Flags().GetBool(flagRecover)
+	if recover {
 		mnemonic, err = input.GetString("Enter your bip39 mnemonic", inBuf)
 		if err != nil {
 			return err
@@ -259,7 +258,7 @@ func RunAddCmd(ctx client.Context, cmd *cobra.Command, args []string, inBuf *buf
 	}
 
 	// Recover key from seed passphrase
-	if recoverKey {
+	if recover {
 		// Hide mnemonic from output
 		showMnemonic = false
 		mnemonic = ""
@@ -294,7 +293,7 @@ func printCreate(cmd *cobra.Command, k *keyring.Record, showMnemonic bool, mnemo
 			out.Mnemonic = mnemonic
 		}
 
-		jsonString, err := json.Marshal(out)
+		jsonString, err := keys.KeysCdc.MarshalJSON(out)
 		if err != nil {
 			return err
 		}

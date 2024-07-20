@@ -4,12 +4,11 @@ import (
 	"fmt"
 	"math/big"
 
-	tmrpcclient "github.com/cometbft/cometbft/rpc/client"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"google.golang.org/grpc/metadata"
+	tmrpcclient "github.com/tendermint/tendermint/rpc/client"
 
 	"github.com/evmos/ethermint/rpc/backend/mocks"
 	rpctypes "github.com/evmos/ethermint/rpc/types"
@@ -130,20 +129,20 @@ func (suite *BackendTestSuite) TestGetProof() {
 				RegisterAccount(queryClient, addr, bn.Int64())
 
 				// Use the IAVL height if a valid tendermint height is passed in.
-				iavlHeight := bn.Int64()
+				ivalHeight := bn.Int64() - 1
 				RegisterABCIQueryWithOptions(
 					client,
 					bn.Int64(),
 					"store/evm/key",
 					evmtypes.StateKey(address1, common.HexToHash("0x0").Bytes()),
-					tmrpcclient.ABCIQueryOptions{Height: iavlHeight, Prove: true},
+					tmrpcclient.ABCIQueryOptions{Height: ivalHeight, Prove: true},
 				)
 				RegisterABCIQueryWithOptions(
 					client,
 					bn.Int64(),
 					"store/acc/key",
 					authtypes.AddressStoreKey(sdk.AccAddress(address1.Bytes())),
-					tmrpcclient.ABCIQueryOptions{Height: iavlHeight, Prove: true},
+					tmrpcclient.ABCIQueryOptions{Height: ivalHeight, Prove: true},
 				)
 			},
 			true,
@@ -360,24 +359,8 @@ func (suite *BackendTestSuite) TestGetTransactionCount() {
 			"pass - account doesn't exist",
 			false,
 			rpctypes.NewBlockNumber(big.NewInt(1)),
-			func(addr common.Address, bn rpctypes.BlockNumber) {
-				var header metadata.MD
-				queryClient := suite.backend.queryClient.QueryClient.(*mocks.EVMQueryClient)
-				RegisterParams(queryClient, &header, 1)
-			},
+			func(addr common.Address, bn rpctypes.BlockNumber) {},
 			true,
-			hexutil.Uint64(0),
-		},
-		{
-			"fail - block height is in the future",
-			false,
-			rpctypes.NewBlockNumber(big.NewInt(10000)),
-			func(addr common.Address, bn rpctypes.BlockNumber) {
-				var header metadata.MD
-				queryClient := suite.backend.queryClient.QueryClient.(*mocks.EVMQueryClient)
-				RegisterParams(queryClient, &header, 1)
-			},
-			false,
 			hexutil.Uint64(0),
 		},
 		// TODO: Error mocking the GetAccount call - problem with Any type

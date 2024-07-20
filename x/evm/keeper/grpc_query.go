@@ -20,11 +20,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/cosmos/cosmos-sdk/codec"
-	"github.com/cosmos/cosmos-sdk/store/prefix"
-	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
-	"github.com/cosmos/cosmos-sdk/types/query"
-	"github.com/evmos/ethermint/utils"
 	"math/big"
 	"time"
 
@@ -45,6 +40,7 @@ import (
 	ethparams "github.com/ethereum/go-ethereum/params"
 
 	ethermint "github.com/evmos/ethermint/types"
+	"github.com/evmos/ethermint/utils"
 	"github.com/evmos/ethermint/x/evm/statedb"
 	"github.com/evmos/ethermint/x/evm/types"
 )
@@ -236,7 +232,6 @@ func (k Keeper) EthCall(c context.Context, req *types.EthCallRequest) (*types.Ms
 	}
 
 	ctx := sdk.UnwrapSDKContext(c)
-	ctx = utils.UseZeroGasConfig(ctx) // avoid Cosmos consumes gas unexpectedly.
 
 	var args types.TransactionArgs
 	err := json.Unmarshal(req.Args, &args)
@@ -280,7 +275,6 @@ func (k Keeper) EstimateGas(c context.Context, req *types.EthCallRequest) (*type
 
 	ctx := sdk.UnwrapSDKContext(c)
 	ctx = utils.UseZeroGasConfig(ctx) // avoid Cosmos consumes gas unexpectedly.
-
 	chainID, err := getChainID(ctx, req.ChainId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -298,9 +292,9 @@ func (k Keeper) EstimateGas(c context.Context, req *types.EthCallRequest) (*type
 
 	// Binary search the gas requirement, as it may be higher than the amount used
 	var (
-		lo     = ethparams.TxGas - 1
-		hi     uint64
-		gasCap uint64
+		lo  = ethparams.TxGas - 1
+		hi  uint64
+		cap uint64
 	)
 
 	// Determine the highest gas limit can be used during the estimation.
@@ -322,7 +316,7 @@ func (k Keeper) EstimateGas(c context.Context, req *types.EthCallRequest) (*type
 	if req.GasCap != 0 && hi > req.GasCap {
 		hi = req.GasCap
 	}
-	gasCap = hi
+	cap = hi
 	cfg, err := k.EVMConfig(ctx, GetProposerAddress(ctx, req.ProposerAddress), chainID)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to load evm config")
@@ -378,7 +372,7 @@ func (k Keeper) EstimateGas(c context.Context, req *types.EthCallRequest) (*type
 	}
 
 	// Reject the transaction as invalid if it still fails at the highest allowance
-	if hi == gasCap {
+	if hi == cap {
 		failed, result, err := executable(hi)
 		if err != nil {
 			return nil, err
@@ -392,7 +386,7 @@ func (k Keeper) EstimateGas(c context.Context, req *types.EthCallRequest) (*type
 				return nil, errors.New(result.VmError)
 			}
 			// Otherwise, the specified gas cap is too low
-			return nil, fmt.Errorf("gas required exceeds allowance (%d)", gasCap)
+			return nil, fmt.Errorf("gas required exceeds allowance (%d)", cap)
 		}
 	}
 	return &types.EstimateGasResponse{Gas: hi}, nil
@@ -410,7 +404,7 @@ func (k Keeper) TraceTx(c context.Context, req *types.QueryTraceTxRequest) (*typ
 		return nil, status.Errorf(codes.InvalidArgument, "output limit cannot be negative, got %d", req.TraceConfig.Limit)
 	}
 
-	// get the context of block beginning
+	// minus one to get the context of block beginning
 	contextHeight := req.BlockNumber
 	if contextHeight < 1 {
 		// 0 is a special value in `ContextWithHeight`
@@ -418,8 +412,7 @@ func (k Keeper) TraceTx(c context.Context, req *types.QueryTraceTxRequest) (*typ
 	}
 
 	ctx := sdk.UnwrapSDKContext(c)
-	ctx = utils.UseZeroGasConfig(ctx) // avoid Cosmos consumes gas unexpectedly.
-
+	ctx = utils.UseZeroGasConfig(ctx)
 	ctx = ctx.WithBlockHeight(contextHeight)
 	ctx = ctx.WithBlockTime(req.BlockTime)
 	ctx = ctx.WithHeaderHash(common.Hex2Bytes(req.BlockHash))
@@ -489,15 +482,14 @@ func (k Keeper) TraceBlock(c context.Context, req *types.QueryTraceBlockRequest)
 		return nil, status.Errorf(codes.InvalidArgument, "output limit cannot be negative, got %d", req.TraceConfig.Limit)
 	}
 
-	// get the context of block beginning
-	contextHeight := req.BlockNumber
+	// minus one to get the context of block beginning
+	contextHeight := req.BlockNumber - 1
 	if contextHeight < 1 {
 		// 0 is a special value in `ContextWithHeight`
 		contextHeight = 1
 	}
 
 	ctx := sdk.UnwrapSDKContext(c)
-	ctx = utils.UseZeroGasConfig(ctx) // avoid Cosmos consumes gas unexpectedly.
 	ctx = ctx.WithBlockHeight(contextHeight)
 	ctx = ctx.WithBlockTime(req.BlockTime)
 	ctx = ctx.WithHeaderHash(common.Hex2Bytes(req.BlockHash))
@@ -551,8 +543,6 @@ func (k *Keeper) traceTx(
 	commitMessage bool,
 	tracerJSONConfig json.RawMessage,
 ) (*interface{}, uint, error) {
-	ctx = utils.UseZeroGasConfig(ctx) // avoid Cosmos consumes gas unexpectedly.
-
 	// Assemble the structured logger or the JavaScript tracer
 	var (
 		tracer    tracers.Tracer
@@ -644,192 +634,6 @@ func (k Keeper) BaseFee(c context.Context, _ *types.QueryBaseFeeRequest) (*types
 	}
 
 	return res, nil
-}
-
-func (k Keeper) generateJsonOfVirtualFrontierContract(ctx context.Context, cdc codec.BinaryCodec, vfContract *types.VirtualFrontierContract) (jsonContent string, err error) {
-	sdkCtx := sdk.UnwrapSDKContext(ctx)
-
-	switch vfContract.Type {
-	case types.VFC_TYPE_BANK:
-		var bankMeta types.VFBankContractMetadata
-		cdc.MustUnmarshal(vfContract.Metadata, &bankMeta)
-
-		// get bank denom metadata
-		bankDenomMeta, found := k.bankKeeper.GetDenomMetaData(sdkCtx, bankMeta.MinDenom)
-
-		if !found {
-			err = sdkerrors.ErrNotFound.Wrapf("denom metadata not found for %s of virtual frontier bank contract %s", bankMeta.MinDenom, vfContract.Address)
-			return
-		}
-
-		denomMeta, _ := types.CollectMetadataForVirtualFrontierBankContract(bankDenomMeta)
-
-		bc := newVFBankContractResult(vfContract, &bankMeta, &denomMeta)
-
-		bz, errMarshaller := json.Marshal(bc)
-		if errMarshaller != nil {
-			err = sdkerrors.ErrJSONMarshal.Wrapf("failed to marshal virtual frontier bank contract %s: %v", vfContract.Address, errMarshaller)
-			return
-		}
-
-		jsonContent = string(bz)
-		return
-	default:
-		err = sdkerrors.ErrNotSupported.Wrapf("not supported JSON content builder for type %d", vfContract.Type)
-		return
-	}
-}
-
-type vfBankContractResult struct {
-	Address  string `json:"address"`
-	Type     string `json:"type"`
-	State    string `json:"state"`
-	MinDenom string `json:"min_denom"`
-	Decimals uint32 `json:"decimals"`
-	Name     string `json:"name"`
-}
-
-func newVFBankContractResult(
-	vfContract *types.VirtualFrontierContract,
-	vfcBankMeta *types.VFBankContractMetadata,
-	vfcBankDenomMeta *types.VirtualFrontierBankContractDenomMetadata,
-) vfBankContractResult {
-	result := vfBankContractResult{
-		Address:  vfContract.Address,
-		Type:     "bank",
-		State:    "",
-		MinDenom: vfcBankMeta.MinDenom,
-		Decimals: vfcBankDenomMeta.Decimals,
-		Name:     vfcBankDenomMeta.Name,
-	}
-
-	if vfContract.Active {
-		result.State = "activated"
-	} else {
-		result.State = "disabled"
-	}
-
-	return result
-}
-
-// ListVirtualFrontierContracts returns the JSON formatted list of virtual frontier contract from the store
-func (k Keeper) ListVirtualFrontierContracts(ctx context.Context, req *types.QueryVirtualFrontierContractsRequest) (*types.QueryVirtualFrontierContractsResponse, error) {
-	sdkCtx := sdk.UnwrapSDKContext(ctx)
-
-	store := sdkCtx.KVStore(k.storeKey)
-	vfcStore := prefix.NewStore(store, types.KeyPrefixVirtualFrontierContract)
-
-	vfContracts, pageRes, err := query.GenericFilteredPaginate(k.cdc, vfcStore, req.Pagination, func(key []byte, vfc *types.VirtualFrontierContract) (*types.VirtualFrontierContract, error) {
-		return vfc, nil
-	}, func() *types.VirtualFrontierContract {
-		return &types.VirtualFrontierContract{}
-	})
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	var jsonContracts []string
-
-	for _, contract := range vfContracts {
-		jsonContent, err := k.generateJsonOfVirtualFrontierContract(ctx, k.cdc, contract)
-		if err != nil {
-			return nil, status.Error(codes.Internal, err.Error())
-		}
-
-		jsonContracts = append(jsonContracts, jsonContent)
-	}
-
-	return &types.QueryVirtualFrontierContractsResponse{
-		VirtualFrontierContractsJson: jsonContracts,
-		Pagination:                   pageRes,
-	}, nil
-}
-
-func (k Keeper) VirtualFrontierBankContractByDenom(ctx context.Context, request *types.QueryVirtualFrontierBankContractByDenomRequest) (*types.QueryVirtualFrontierBankContractByDenomResponse, error) {
-	contractAddress, found := k.GetVirtualFrontierBankContractAddressByDenom(sdk.UnwrapSDKContext(ctx), request.MinDenom)
-	if !found {
-		return nil, status.Errorf(codes.NotFound, "no contract not found for %s", request.MinDenom)
-	}
-
-	vfContract := k.GetVirtualFrontierContract(sdk.UnwrapSDKContext(ctx), contractAddress)
-	if vfContract == nil {
-		return nil, status.Errorf(codes.NotFound, "contract %s not found", contractAddress)
-	}
-
-	if vfContract.Type != types.VFC_TYPE_BANK {
-		return nil, status.Errorf(codes.Internal, "contract %s is not a bank contract", contractAddress)
-	}
-
-	var bankMeta types.VFBankContractMetadata
-	err := k.cdc.Unmarshal(vfContract.Metadata, &bankMeta)
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	return &types.QueryVirtualFrontierBankContractByDenomResponse{
-		Pair: &types.VFBCPair{
-			ContractAddress: vfContract.Address,
-			MinDenom:        bankMeta.MinDenom,
-			Enabled:         vfContract.Active,
-		},
-	}, nil
-}
-
-func (k Keeper) VirtualFrontierContractByAddress(ctx context.Context, request *types.QueryVirtualFrontierContractByAddressRequest) (*types.QueryVirtualFrontierContractByAddressResponse, error) {
-	vfContract := k.GetVirtualFrontierContract(sdk.UnwrapSDKContext(ctx), common.HexToAddress(request.Address))
-	if vfContract == nil {
-		return nil, status.Error(codes.NotFound, "contract not found")
-	}
-
-	jsonContent, err := k.generateJsonOfVirtualFrontierContract(ctx, k.cdc, vfContract)
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	return &types.QueryVirtualFrontierContractByAddressResponse{
-		VirtualFrontierContractJson: jsonContent,
-	}, nil
-}
-
-func (k Keeper) ListVirtualFrontierBankContracts(ctx context.Context, req *types.QueryVirtualFrontierBankContractsRequest) (*types.QueryVirtualFrontierBankContractsResponse, error) {
-	sdkCtx := sdk.UnwrapSDKContext(ctx)
-
-	store := sdkCtx.KVStore(k.storeKey)
-	vfcStore := prefix.NewStore(store, types.KeyPrefixVirtualFrontierContract)
-
-	vfContracts, pageRes, err := query.GenericFilteredPaginate(k.cdc, vfcStore, req.Pagination, func(key []byte, vfc *types.VirtualFrontierContract) (*types.VirtualFrontierContract, error) {
-		if vfc.Type != types.VFC_TYPE_BANK {
-			return nil, nil // exclude non-bank contracts
-		}
-
-		return vfc, nil
-	}, func() *types.VirtualFrontierContract {
-		return &types.VirtualFrontierContract{}
-	})
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	var pairs []*types.VFBCPair
-
-	for _, contract := range vfContracts {
-		var bankMeta types.VFBankContractMetadata
-		err := k.cdc.Unmarshal(contract.Metadata, &bankMeta)
-		if err != nil {
-			return nil, status.Error(codes.Internal, err.Error())
-		}
-
-		pairs = append(pairs, &types.VFBCPair{
-			ContractAddress: contract.Address,
-			MinDenom:        bankMeta.MinDenom,
-			Enabled:         contract.Active,
-		})
-	}
-
-	return &types.QueryVirtualFrontierBankContractsResponse{
-		Pairs:      pairs,
-		Pagination: pageRes,
-	}, nil
 }
 
 // getChainID parse chainID from current context if not provided

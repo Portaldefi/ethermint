@@ -37,9 +37,9 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
 
-	"github.com/cometbft/cometbft/libs/log"
-	rpcclient "github.com/cometbft/cometbft/rpc/jsonrpc/client"
-	tmtypes "github.com/cometbft/cometbft/types"
+	"github.com/tendermint/tendermint/libs/log"
+	rpcclient "github.com/tendermint/tendermint/rpc/jsonrpc/client"
+	tmtypes "github.com/tendermint/tendermint/types"
 
 	"github.com/evmos/ethermint/rpc/ethereum/pubsub"
 	rpcfilters "github.com/evmos/ethermint/rpc/namespaces/ethereum/eth/filters"
@@ -681,7 +681,7 @@ func (api *pubSubAPI) subscribePendingTransactions(wsConn *wsConn, subID rpc.ID)
 	return unsubFn, nil
 }
 
-func (api *pubSubAPI) subscribeSyncing(_ *wsConn, _ rpc.ID) (pubsub.UnsubscribeFunc, error) {
+func (api *pubSubAPI) subscribeSyncing(wsConn *wsConn, subID rpc.ID) (pubsub.UnsubscribeFunc, error) {
 	return nil, errors.New("syncing subscription is not implemented")
 }
 
