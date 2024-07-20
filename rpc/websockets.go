@@ -109,10 +109,11 @@ func (s *websocketsServer) Start() {
 
 	go func() {
 		var err error
-		/* #nosec G114 -- http functions have no support for timeouts */
 		if s.certFile == "" || s.keyFile == "" {
+			s.logger.Info("Starting WebSocket server without TLS", "address", s.wsAddr)
 			err = http.ListenAndServe(s.wsAddr, ws)
 		} else {
+			s.logger.Info("Starting WebSocket server with TLS", "address", s.wsAddr)
 			err = http.ListenAndServeTLS(s.wsAddr, s.certFile, s.keyFile, ws)
 		}
 
@@ -121,7 +122,7 @@ func (s *websocketsServer) Start() {
 				return
 			}
 
-			s.logger.Error("failed to start HTTP server for WS", "error", err.Error())
+			s.logger.Error("Failed to start HTTP server for WS", "error", err.Error())
 		}
 	}()
 }
@@ -135,7 +136,8 @@ func (s *websocketsServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		s.logger.Debug("websocket upgrade failed", "error", err.Error())
+		s.logger.Debug("WebSocket upgrade failed", "error", err.Error())
+		http.Error(w, "Could not upgrade to WebSocket", http.StatusInternalServerError)
 		return
 	}
 
@@ -681,7 +683,7 @@ func (api *pubSubAPI) subscribePendingTransactions(wsConn *wsConn, subID rpc.ID)
 	return unsubFn, nil
 }
 
-func (api *pubSubAPI) subscribeSyncing(wsConn *wsConn, subID rpc.ID) (pubsub.UnsubscribeFunc, error) {
+func (api *pubSubAPI) subscribeSyncing(_ *wsConn, _ rpc.ID) (pubsub.UnsubscribeFunc, error) {
 	return nil, errors.New("syncing subscription is not implemented")
 }
 
