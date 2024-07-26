@@ -25,6 +25,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/gorilla/mux"
@@ -140,6 +141,11 @@ func (s *websocketsServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Could not upgrade to WebSocket", http.StatusInternalServerError)
 		return
 	}
+
+	conn.SetPingHandler(func(appData string) error {
+		s.logger.Debug("ping received", "data", appData)
+		return conn.WriteControl(websocket.PongMessage, []byte(appData), time.Now().Add(time.Second))
+	})
 
 	s.readLoop(&wsConn{
 		mux:  new(sync.Mutex),
@@ -258,7 +264,7 @@ func (s *websocketsServer) readLoop(wsConn *wsConn) {
 			}
 
 			if err := wsConn.WriteJSON(res); err != nil {
-				break
+				return
 			}
 		case "eth_unsubscribe":
 			params, ok := s.getParamsAndCheckValid(msg, wsConn)
@@ -286,7 +292,7 @@ func (s *websocketsServer) readLoop(wsConn *wsConn) {
 			}
 
 			if err := wsConn.WriteJSON(res); err != nil {
-				break
+				return
 			}
 		default:
 			// otherwise, call the usual rpc server to respond
