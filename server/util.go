@@ -74,7 +74,7 @@ func AddCommands(
 func ConnectTmWS(tmRPCAddr, tmEndpoint string, logger tmlog.Logger) *rpcclient.WSClient {
 	tmWsClient, err := rpcclient.NewWS(tmRPCAddr, tmEndpoint,
 		rpcclient.MaxReconnectAttempts(256),
-		rpcclient.ReadWait(120*time.Second),
+		rpcclient.ReadWait(0*time.Second),
 		rpcclient.WriteWait(120*time.Second),
 		rpcclient.PingPeriod(50*time.Second),
 		rpcclient.OnReconnect(func() {
