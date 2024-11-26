@@ -178,3 +178,26 @@ message MsgUpdateParams {
 // MsgUpdateParamsResponse defines the response structure for executing a
 // MsgUpdateParams message.
 message MsgUpdateParamsResponse {}
+
+
+// MsgMetaEthereumTx encapsulates an Ethereum transaction with additional metadata.
+message MsgMetaEthereumTx {
+  option (gogoproto.goproto_getters) = false;
+  option (cosmos_proto.implements_interface) = "cosmos.tx.v1beta1.Msg";
+
+  // data is inner transaction data of the Ethereum transaction
+  google.protobuf.Any data = 1;
+
+  // size is the encoded storage size of the transaction (DEPRECATED)
+  double size = 2 [(gogoproto.jsontag) = "-"];
+  // hash of the transaction in hex format
+  string hash = 3 [(gogoproto.moretags) = "rlp:\"-\""];
+  // from is the ethereum signer address in hex format. This address value is checked
+  // against the address derived from the signature (V, R, S) using the
+  // secp256k1 elliptic curve
+  string from = 4;
+  // gas_price is the gas price used for the transaction
+  string gas_price = 5 [(gogoproto.customtype) = "github.com/cosmos/cosmos-sdk/types.Int"];
+  // gas_used is the amount of gas used by the transaction
+  uint64 gas_used = 6;
+}
