@@ -1,7 +1,7 @@
 #!/bin/bash
 
 KEY="mykey"
-MNEMONIC="curtain hat remain song receive tower stereo hope frog cheap brown plate raccoon post reflect wool sail salmon game salon group glimpse adult shift"
+MNEMONIC="fire utility captain payment remember achieve maid rapid deposit industry divide chronic office floor sample water boat domain music crawl round tourist peasant rail"
 
 CHAINID="ethermint_9000-1"
 MONIKER="localtestnet"
@@ -18,7 +18,7 @@ command -v jq > /dev/null 2>&1 || { echo >&2 "jq not installed. More info: https
 # remove existing daemon and client
 rm -rf ~/.ethermintd*
 
-make install
+make install LDFLAGS=
 
 ethermintd config keyring-backend $KEYRING
 ethermintd config chain-id $CHAINID
