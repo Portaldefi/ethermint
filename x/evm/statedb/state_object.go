@@ -81,7 +81,10 @@ type stateObject struct {
 	address common.Address
 
 	// flags
-	suicided bool
+	selfDestructed bool
+
+	// Flag whether the object was created in the current transaction
+	created bool
 }
 
 // newObject creates a state object, origAccount is nil if it's newly created.
@@ -117,8 +120,8 @@ func (s *stateObject) empty() bool {
 	return s.account.Nonce == 0 && bytes.Equal(s.account.CodeHash, emptyCodeHash)
 }
 
-func (s *stateObject) markSuicided() {
-	s.suicided = true
+func (s *stateObject) markSelfDestructed() {
+	s.selfDestructed = true
 }
 
 //

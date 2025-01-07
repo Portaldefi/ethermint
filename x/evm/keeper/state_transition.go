@@ -16,10 +16,8 @@
 package keeper
 
 import (
-	"bytes"
 	"fmt"
 	"math/big"
-	"sort"
 
 	cmttypes "github.com/cometbft/cometbft/types"
 
@@ -69,29 +67,9 @@ func (k *Keeper) NewEVM(
 		cfg.BlockOverrides.Apply(&blockCtx)
 	}
 	txCtx := core.NewEVMTxContext(&msg)
-	if cfg.Tracer == nil {
-		cfg.Tracer = k.Tracer(ctx, msg, cfg.ChainConfig)
-	}
 	vmConfig := k.VMConfig(ctx, msg, cfg)
-	rules := cfg.ChainConfig.Rules(big.NewInt(ctx.BlockHeight()), cfg.ChainConfig.MergeNetsplitBlock != nil, blockCtx.Time)
-	contracts := make(map[common.Address]vm.PrecompiledContract)
-	active := make([]common.Address, 0)
-	for addr, c := range vm.DefaultPrecompiles(rules) {
-		contracts[addr] = c
-		active = append(active, addr)
-	}
-	for _, fn := range k.customContractFns {
-		c := fn(ctx, rules)
-		addr := c.Address()
-		contracts[addr] = c
-		active = append(active, addr)
-	}
-	sort.SliceStable(active, func(i, j int) bool {
-		return bytes.Compare(active[i].Bytes(), active[j].Bytes()) < 0
-	})
-	evm := vm.NewEVM(blockCtx, txCtx, stateDB, cfg.ChainConfig, vmConfig)
-	evm.WithPrecompiles(contracts, active)
-	return evm
+
+	return vm.NewEVM(blockCtx, txCtx, stateDB, cfg.ChainConfig, vmConfig)
 }
 
 // GetHashFn implements vm.GetHashFunc for Ethermint. It handles 3 cases:
@@ -409,7 +387,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 	// Execute the preparatory steps for state transition which includes:
 	// - prepare accessList(post-berlin)
 	// - reset transient storage(eip 1153)
-	stateDB.Prepare(rules, msg.From, cfg.CoinBase, msg.To, vm.DefaultActivePrecompiles(rules), msg.AccessList)
+	stateDB.Prepare(rules, msg.From, cfg.CoinBase, msg.To, vm.ActivePrecompiles(rules), msg.AccessList)
 
 	if contractCreation {
 		// take over the nonce management from evm:

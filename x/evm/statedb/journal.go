@@ -100,7 +100,7 @@ type (
 	resetObjectChange struct {
 		prev *stateObject
 	}
-	suicideChange struct {
+	selfDestructChange struct {
 		account *common.Address
 		prev    bool // whether account had already suicided
 	}
@@ -155,14 +155,14 @@ func (ch resetObjectChange) Dirtied() *common.Address {
 	return nil
 }
 
-func (ch suicideChange) Revert(s *StateDB) {
+func (ch selfDestructChange) Revert(s *StateDB) {
 	obj := s.getStateObject(*ch.account)
 	if obj != nil {
-		obj.suicided = ch.prev
+		obj.selfDestructed = ch.prev
 	}
 }
 
-func (ch suicideChange) Dirtied() *common.Address {
+func (ch selfDestructChange) Dirtied() *common.Address {
 	return ch.account
 }
 

@@ -494,10 +494,10 @@ func (suite *StateDBTestSuite) TestSuicide() {
 	}
 
 	// Call Suicide
-	suite.Require().Equal(true, db.Suicide(suite.Address))
+	db.SelfDestruct(suite.Address)
 
 	// Check suicided is marked
-	suite.Require().Equal(true, db.HasSuicided(suite.Address))
+	suite.Require().Equal(true, db.HasSelfDestructed(suite.Address))
 
 	// Commit state
 	suite.Require().NoError(db.Commit())
@@ -518,7 +518,7 @@ func (suite *StateDBTestSuite) TestSuicide() {
 
 	// Check code is still present in addr2 and suicided is false
 	suite.Require().NotNil(db.GetCode(addr2))
-	suite.Require().Equal(false, db.HasSuicided(addr2))
+	suite.Require().Equal(false, db.HasSelfDestructed(addr2))
 }
 
 func (suite *StateDBTestSuite) TestExist() {
@@ -530,7 +530,7 @@ func (suite *StateDBTestSuite) TestExist() {
 	}{
 		{"success, account exists", suite.Address, func(vm.StateDB) {}, true},
 		{"success, has suicided", suite.Address, func(vmdb vm.StateDB) {
-			vmdb.Suicide(suite.Address)
+			vmdb.SelfDestruct(suite.Address)
 		}, true},
 		{"success, account doesn't exist", tests.GenerateAddress(), func(vm.StateDB) {}, false},
 	}

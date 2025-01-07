@@ -180,7 +180,7 @@ func BenchmarkAddRefund(b *testing.B) {
 	}
 }
 
-func BenchmarkSuicide(b *testing.B) {
+func BenchmarkSelfDestruct(b *testing.B) {
 	suite := StatedbBenchmarkTestSuite{}
 	suite.SetupTest(b)
 	vmdb := suite.StateDB()
@@ -193,6 +193,6 @@ func BenchmarkSuicide(b *testing.B) {
 		vmdb.CreateAccount(addr)
 		b.StartTimer()
 
-		vmdb.Suicide(addr)
+		vmdb.SelfDestruct(addr)
 	}
 }

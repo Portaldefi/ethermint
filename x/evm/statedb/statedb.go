@@ -236,11 +236,11 @@ func (s *StateDB) GetRefund() uint64 {
 	return s.refund
 }
 
-// HasSuicided returns if the contract is suicided in current transaction.
-func (s *StateDB) HasSuicided(addr common.Address) bool {
+// HasSelfDestructed returns if the contract is self-destructed in current transaction.
+func (s *StateDB) HasSelfDestructed(addr common.Address) bool {
 	stateObject := s.getStateObject(addr)
 	if stateObject != nil {
-		return stateObject.suicided
+		return stateObject.selfDestructed
 	}
 	return false
 }
@@ -289,6 +289,9 @@ func (s *StateDB) createObject(addr common.Address) *stateObject {
 	} else {
 		s.journal.append(resetObjectChange{prev: prev})
 	}
+
+	newobj.created = true
+
 	s.setStateObject(newobj)
 	return newobj
 }
@@ -430,29 +433,38 @@ func (s *StateDB) SetStorage(addr common.Address, storage Storage) {
 	stateObject.SetStorage(storage)
 }
 
-// Suicide marks the given account as suicided.
+// SelfDestruct marks the given account as self-destructed.
 // This clears the account balance.
 //
 // The account's state object is still available until the state is committed,
-// getStateObject will return a non-nil account after Suicide.
-func (s *StateDB) Suicide(addr common.Address) bool {
+// getStateObject will return a non-nil account after SelfDestruct.
+func (s *StateDB) SelfDestruct(addr common.Address) {
 	stateObject := s.getStateObject(addr)
 	if stateObject == nil {
-		return false
+		return
 	}
-	s.journal.append(suicideChange{
+	s.journal.append(selfDestructChange{
 		account: &addr,
-		prev:    stateObject.suicided,
+		prev:    stateObject.selfDestructed,
 	})
-	stateObject.markSuicided()
+	stateObject.markSelfDestructed()
 
 	// clear balance
 	balance := s.GetBalance(addr)
 	if balance.Sign() > 0 {
 		s.SubBalance(addr, balance)
 	}
+}
 
-	return true
+func (s *StateDB) Selfdestruct6780(addr common.Address) {
+	stateObject := s.getStateObject(addr)
+	if stateObject == nil {
+		return
+	}
+
+	if stateObject.created {
+		s.SelfDestruct(addr)
+	}
 }
 
 // SetTransientState sets transient storage for a given account. It
@@ -608,7 +620,7 @@ func (s *StateDB) Commit() error {
 
 	for _, addr := range s.journal.sortedDirties() {
 		obj := s.stateObjects[addr]
-		if obj.suicided {
+		if obj.selfDestructed {
 			if err := s.keeper.DeleteAccount(s.ctx, obj.Address()); err != nil {
 				return errorsmod.Wrap(err, "failed to delete account")
 			}
