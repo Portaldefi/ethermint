@@ -52,6 +52,10 @@ type BankKeeper interface {
 	BlockedAddr(addr sdk.AccAddress) bool
 }
 
+type GaslessKeeper interface {
+	IsGaslessFunction(ctx sdk.Context, contractAddress, methodId string) bool
+}
+
 // StakingKeeper returns the historical headers kept in store.
 type StakingKeeper interface {
 	GetHistoricalInfo(ctx context.Context, height int64) (stakingtypes.HistoricalInfo, error)

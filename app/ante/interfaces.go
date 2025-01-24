@@ -36,6 +36,10 @@ type EVMKeeper interface {
 	GetTxIndexTransient(ctx sdk.Context) uint64
 }
 
+type GaslessKeeper interface {
+	IsGaslessFunction(ctx sdk.Context, contractAddress, methodID string) bool
+}
+
 type protoTxProvider interface {
 	GetProtoTx() *tx.Tx
 }

@@ -36,6 +36,7 @@ import (
 type HandlerOptions struct {
 	AccountKeeper          evmtypes.AccountKeeper
 	BankKeeper             evmtypes.BankKeeper
+	GaslessKeeper          evmtypes.GaslessKeeper
 	IBCKeeper              *ibckeeper.Keeper
 	FeeMarketKeeper        FeeMarketKeeper
 	EvmKeeper              EVMKeeper
@@ -117,7 +118,7 @@ func newEthAnteHandler(options HandlerOptions) sdk.AnteHandler {
 		}
 
 		ctx, err = CheckEthGasConsume(
-			ctx, tx, ethCfg, options.EvmKeeper,
+			ctx, tx, ethCfg, options.EvmKeeper, options.GaslessKeeper,
 			baseFee, options.MaxTxGasWanted, evmDenom,
 		)
 		if err != nil {
