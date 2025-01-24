@@ -16,6 +16,7 @@
 package ante
 
 import (
+	"encoding/hex"
 	"math"
 	"math/big"
 
@@ -103,6 +104,7 @@ func CheckEthGasConsume(
 	ctx sdk.Context, tx sdk.Tx,
 	ethCfg *params.ChainConfig,
 	evmKeeper EVMKeeper,
+	gaslessKeeper GaslessKeeper,
 	baseFee *big.Int,
 	maxGasWanted uint64,
 	evmDenom string,
@@ -127,6 +129,17 @@ func CheckEthGasConsume(
 		txData, err := evmtypes.UnpackTxData(msgEthTx.Data)
 		if err != nil {
 			return ctx, errorsmod.Wrap(err, "failed to unpack tx data")
+		}
+
+		contractAddress := txData.GetTo()
+		data := txData.GetData()
+
+		// Skip gas fee deduction for certain contract address and method id
+		if len(data) >= 4 && contractAddress != nil {
+			methodId := hex.EncodeToString(data[:4])
+			if gaslessKeeper.IsGaslessFunction(ctx, contractAddress.Hex(), "") || gaslessKeeper.IsGaslessFunction(ctx, contractAddress.Hex(), methodId) {
+				continue
+			}
 		}
 
 		priority := evmtypes.GetTxPriority(txData, baseFee)
