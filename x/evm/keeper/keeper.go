@@ -78,6 +78,8 @@ type Keeper struct {
 	// a set of store keys that should cover all the precompile use cases,
 	// or ideally just pass the application's all stores.
 	keys map[string]storetypes.StoreKey
+
+	precompiledFunc map[common.Address]PrecompiledContractFunc
 }
 
 // NewKeeper generates new evm module keeper
