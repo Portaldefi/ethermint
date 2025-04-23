@@ -341,6 +341,11 @@ func (k *Keeper) ApplyMessageWithConfig(
 		}
 	}
 	evm = k.NewEVM(ctx, msg, cfg, stateDB)
+
+	// set the custom precompiles to the EVM
+	activeAddrs, activePrecompiles := k.Precompiles(ctx)
+	evm.WithPrecompiles(activePrecompiles, activeAddrs)
+
 	leftoverGas := msg.GasLimit
 	sender := vm.AccountRef(msg.From)
 	// Allow the tracer captures the tx level events, mainly the gas consumption.
@@ -387,7 +392,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 	// Execute the preparatory steps for state transition which includes:
 	// - prepare accessList(post-berlin)
 	// - reset transient storage(eip 1153)
-	stateDB.Prepare(rules, msg.From, cfg.CoinBase, msg.To, vm.ActivePrecompiles(rules), msg.AccessList)
+	stateDB.Prepare(rules, msg.From, cfg.CoinBase, msg.To, evm.ActivePrecompiles(rules), msg.AccessList)
 
 	if contractCreation {
 		// take over the nonce management from evm:
