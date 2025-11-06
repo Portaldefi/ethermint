@@ -70,6 +70,9 @@ The pass backend requires GnuPG: https://gnupg.org/
 		panic(err)
 	}
 
+	// add OpenBao vault flag
+	addCmd.Flags().String("openbao-vault", "", "OpenBao vault/key-manager name (required when using --keyring-backend openbao)")
+
 	addCmd.RunE = runAddCmd
 
 	cmd.AddCommand(
