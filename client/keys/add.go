@@ -18,11 +18,15 @@ package keys
 import (
 	"bufio"
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/evmos/ethermint/crypto/ethsecp256k1"
 	etherminthd "github.com/evmos/ethermint/crypto/hd"
 
 	bip39 "github.com/cosmos/go-bip39"
@@ -50,6 +54,7 @@ const (
 	flagMultiSigThreshold = "multisig-threshold"
 	flagNoSort            = "nosort"
 	flagHDPath            = "hd-path"
+	flagOpenBaoVault      = "openbao-vault"
 
 	mnemonicEntropySize = 256
 )
@@ -155,8 +160,19 @@ func RunAddCmd(ctx client.Context, cmd *cobra.Command, args []string, inBuf *buf
 		}
 	}
 
+	// Check if this is an OpenBao key by detecting keyring backend
+	keyringBackend, _ := cmd.Flags().GetString(flags.FlagKeyringBackend)
+	isOpenBao := keyringBackend == "openbao"
+
 	pubKey, _ := cmd.Flags().GetString(keys.FlagPublicKey)
+
 	if pubKey != "" {
+		// Check if this is an OpenBao key (based on keyring backend)
+		if isOpenBao {
+			return runAddOpenBaoKey(cmd, ctx, kb, name, pubKey, outputFormat)
+		}
+
+		// Regular offline key (JSON format)
 		var pk cryptotypes.PubKey
 		if err = ctx.Codec.UnmarshalInterfaceJSON([]byte(pubKey), &pk); err != nil {
 			return err
@@ -168,6 +184,11 @@ func RunAddCmd(ctx client.Context, cmd *cobra.Command, args []string, inBuf *buf
 		}
 
 		return printCreate(cmd, k, false, "", outputFormat)
+	}
+
+	// If using OpenBao backend, pubkey is required
+	if isOpenBao {
+		return errors.New("openbao keyring-backend requires --pubkey flag with hex-encoded public key")
 	}
 
 	coinType, _ := cmd.Flags().GetUint32(flagCoinType)
@@ -317,4 +338,72 @@ func validateMultisigThreshold(k, nKeys int) error {
 			"threshold k of n multisignature: %d < %d", nKeys, k)
 	}
 	return nil
+}
+
+func runAddOpenBaoKey(cmd *cobra.Command, ctx client.Context, kb keyring.Keyring, name, pubKeyHex, outputFormat string) error {
+	// Get OpenBao vault name
+	vaultName, _ := cmd.Flags().GetString(flagOpenBaoVault)
+	if vaultName == "" {
+		return errors.New("keyring-backend openbao requires --openbao-vault flag")
+	}
+
+	// Parse hex public key
+	pubKeyHex = strings.TrimPrefix(pubKeyHex, "0x")
+	pubKeyBytes, err := hex.DecodeString(pubKeyHex)
+	if err != nil {
+		return fmt.Errorf("failed to decode hex public key: %w", err)
+	}
+
+	// Convert to compressed secp256k1 format
+	var compressedPubKey []byte
+
+	if len(pubKeyBytes) == 65 {
+		// Uncompressed format (04 + x + y) → convert to compressed
+		if pubKeyBytes[0] != 0x04 {
+			return errors.New("65-byte public key must start with 0x04")
+		}
+
+		x := pubKeyBytes[1:33]  // x coordinate
+		y := pubKeyBytes[33:65] // y coordinate
+
+		// Determine prefix based on y parity
+		var prefix byte
+		if y[31]&1 == 0 {
+			prefix = 0x02 // y is even
+		} else {
+			prefix = 0x03 // y is odd
+		}
+
+		compressedPubKey = make([]byte, 33)
+		compressedPubKey[0] = prefix
+		copy(compressedPubKey[1:], x)
+	} else if len(pubKeyBytes) == 33 {
+		// Already compressed format (02/03 + x)
+		if pubKeyBytes[0] != 0x02 && pubKeyBytes[0] != 0x03 {
+			return errors.New("33-byte public key must start with 0x02 or 0x03")
+		}
+		compressedPubKey = pubKeyBytes
+	} else {
+		return fmt.Errorf("invalid public key length: expected 33 or 65 bytes, got %d", len(pubKeyBytes))
+	}
+
+	// Create ethsecp256k1 public key directly
+	pubKey := &ethsecp256k1.PubKey{Key: compressedPubKey}
+
+	// Derive Ethereum address from public key with proper EIP-55 checksum
+	ethAddress := common.BytesToAddress(pubKey.Address()).String()
+
+	// Save OpenBao key reference
+	k, err := kb.SaveOpenBaoKey(name, pubKey, vaultName, ethAddress)
+	if err != nil {
+		return fmt.Errorf("failed to save OpenBao key: %w", err)
+	}
+
+	// Print success
+	cmd.PrintErrf("\nOpenBao key reference added successfully!\n")
+	cmd.PrintErrf("Vault: %s\n", vaultName)
+	cmd.PrintErrf("Derived Ethereum Address: %s\n", ethAddress)
+	cmd.PrintErrf("\nEnsure OpenBao configuration is set in client.toml (openbao-addr, openbao-token-file) for signing.\n\n")
+
+	return printCreate(cmd, k, false, "", outputFormat)
 }
