@@ -252,7 +252,7 @@ replace (
 	github.com/99designs/keyring => github.com/cosmos/keyring v1.2.0
 	// todo: remove this when go ethereum release new version
 	github.com/cockroachdb/pebble v1.1.0 => github.com/cockroachdb/pebble v0.0.0-20231101195458-481da04154d6
-	github.com/cosmos/cosmos-sdk => github.com/Portaldefi/cosmos-sdk v0.0.0-20251106183745-f108d6a5b847
+	github.com/cosmos/cosmos-sdk => github.com/Portaldefi/cosmos-sdk v0.0.0-20251113155603-c66d067dedcc
 
 	github.com/ethereum/go-ethereum => github.com/Portaldefi/go-ethereum v1.13.6-0.20250423124219-25c56d67bfdb
 	// Fix upstream GHSA-h395-qcrw-5vmq vulnerability.
