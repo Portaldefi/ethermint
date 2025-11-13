@@ -54,7 +54,7 @@ const (
 	flagMultiSigThreshold = "multisig-threshold"
 	flagNoSort            = "nosort"
 	flagHDPath            = "hd-path"
-	flagOpenBaoVault      = "openbao-vault"
+	flagBaoVaultName      = "bao-vault-name"
 
 	mnemonicEntropySize = 256
 )
@@ -160,16 +160,16 @@ func RunAddCmd(ctx client.Context, cmd *cobra.Command, args []string, inBuf *buf
 		}
 	}
 
-	// Check if this is an OpenBao key by detecting keyring backend
+	// Check if this is an Bao key by detecting keyring backend
 	keyringBackend, _ := cmd.Flags().GetString(flags.FlagKeyringBackend)
-	isOpenBao := keyringBackend == "openbao"
+	isBao := keyringBackend == "bao"
 
 	pubKey, _ := cmd.Flags().GetString(keys.FlagPublicKey)
 
 	if pubKey != "" {
-		// Check if this is an OpenBao key (based on keyring backend)
-		if isOpenBao {
-			return runAddOpenBaoKey(cmd, ctx, kb, name, pubKey, outputFormat)
+		// Check if this is an Bao key (based on keyring backend)
+		if isBao {
+			return runAddBaoKey(cmd, ctx, kb, name, pubKey, outputFormat)
 		}
 
 		// Regular offline key (JSON format)
@@ -186,9 +186,9 @@ func RunAddCmd(ctx client.Context, cmd *cobra.Command, args []string, inBuf *buf
 		return printCreate(cmd, k, false, "", outputFormat)
 	}
 
-	// If using OpenBao backend, pubkey is required
-	if isOpenBao {
-		return errors.New("openbao keyring-backend requires --pubkey flag with hex-encoded public key")
+	// If using Bao backend, pubkey is required
+	if isBao {
+		return errors.New("bao keyring-backend requires --pubkey flag with hex-encoded public key")
 	}
 
 	coinType, _ := cmd.Flags().GetUint32(flagCoinType)
@@ -340,11 +340,11 @@ func validateMultisigThreshold(k, nKeys int) error {
 	return nil
 }
 
-func runAddOpenBaoKey(cmd *cobra.Command, ctx client.Context, kb keyring.Keyring, name, pubKeyHex, outputFormat string) error {
-	// Get OpenBao vault name
-	vaultName, _ := cmd.Flags().GetString(flagOpenBaoVault)
+func runAddBaoKey(cmd *cobra.Command, ctx client.Context, kb keyring.Keyring, name, pubKeyHex, outputFormat string) error {
+	// Get Bao vault name
+	vaultName, _ := cmd.Flags().GetString(flagBaoVaultName)
 	if vaultName == "" {
-		return errors.New("keyring-backend openbao requires --openbao-vault flag")
+		return errors.New("keyring-backend bao requires --bao-vault-name flag")
 	}
 
 	// Parse hex public key
@@ -393,17 +393,17 @@ func runAddOpenBaoKey(cmd *cobra.Command, ctx client.Context, kb keyring.Keyring
 	// Derive Ethereum address from public key with proper EIP-55 checksum
 	ethAddress := common.BytesToAddress(pubKey.Address()).String()
 
-	// Save OpenBao key reference
-	k, err := kb.SaveOpenBaoKey(name, pubKey, vaultName, ethAddress)
+	// Save Bao key reference
+	k, err := kb.SaveBaoKey(name, pubKey, vaultName, ethAddress)
 	if err != nil {
-		return fmt.Errorf("failed to save OpenBao key: %w", err)
+		return fmt.Errorf("failed to save Bao key: %w", err)
 	}
 
 	// Print success
-	cmd.PrintErrf("\nOpenBao key reference added successfully!\n")
+	cmd.PrintErrf("\nBao key reference added successfully!\n")
 	cmd.PrintErrf("Vault: %s\n", vaultName)
 	cmd.PrintErrf("Derived Ethereum Address: %s\n", ethAddress)
-	cmd.PrintErrf("\nEnsure OpenBao configuration is set in client.toml (openbao-addr, openbao-token-file) for signing.\n\n")
+	cmd.PrintErrf("\nEnsure Bao configuration is set in client.toml (bao-addr, bao-token-file) for signing.\n\n")
 
 	return printCreate(cmd, k, false, "", outputFormat)
 }
