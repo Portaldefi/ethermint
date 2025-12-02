@@ -403,7 +403,6 @@ func runAddBaoKey(cmd *cobra.Command, ctx client.Context, kb keyring.Keyring, na
 	cmd.PrintErrf("\nBao key reference added successfully!\n")
 	cmd.PrintErrf("Vault: %s\n", vaultName)
 	cmd.PrintErrf("Derived Ethereum Address: %s\n", ethAddress)
-	cmd.PrintErrf("\nEnsure Bao configuration is set in client.toml (bao-addr, bao-token-file) for signing.\n\n")
 
 	return printCreate(cmd, k, false, "", outputFormat)
 }
